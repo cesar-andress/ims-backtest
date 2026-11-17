@@ -1,8 +1,7 @@
 # ims-backtest (IMSFE 2.0)
 
 Reproducible international market selection (IMS) framework with predictive
-validation, robustness checks, and an open data pipeline. Design decisions live
-in [`SPEC.md`](SPEC.md). Phase prompts for Cursor are in [`PROMPTS.md`](PROMPTS.md).
+validation, robustness checks, and an open data pipeline.
 
 ## Requirements
 
@@ -52,7 +51,7 @@ Individual targets:
 
 ## Quality rules
 
-No fabricated data. Every manuscript number must come from `outputs/` generated
+No fabricated data. Every reported number must come from `outputs/` generated
 by code. Features at year *t* may only use information with year ≤ *t*.
 
 Original submission materials under `../old_submission/` are **read-only**.

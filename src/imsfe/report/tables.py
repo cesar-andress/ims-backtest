@@ -1,1 +1,1 @@
-"""Generate CSV, LaTeX, and Markdown tables for the manuscript."""
+"""Generate CSV and Markdown tables from processed outputs."""

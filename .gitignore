@@ -64,3 +64,7 @@ manuscript/
 *.bib
 *.cls
 *.sty
+
+# Internal planning docs (design spec, agent prompts, review notes): local only
+SPEC.md
+PROMPTS.md
