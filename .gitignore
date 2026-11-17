@@ -1,16 +1,29 @@
-# Virtual environments
-.venv/
-venv/
-.env/
+# =====================================================================
+# ALLOWLIST: only the experiment is versioned.
+# Everything at the top level is ignored unless explicitly allowed below.
+# Not versioned (local only): SPEC.md, PROMPTS.md, .cursor/, notebooks/,
+# manuscript/, any LaTeX, raw third-party data.
+# =====================================================================
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/CITATION.cff
+!/.zenodo.json
+!/pyproject.toml
+!/uv.lock
+!/Makefile
+!/config/
+!/src/
+!/tests/
+!/data/
+!/outputs/
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
-.eggs/
-dist/
-/build/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -18,39 +31,14 @@ dist/
 htmlcov/
 .cache/
 
-# Data (immutable downloads and derived; keep manual README)
+# Data: downloads and derived data are rebuilt by the pipeline
 data/raw/
 data/interim/
 data/processed/
 *.parquet
 
-# Outputs logs (tables/figures may be committed later when generated)
-outputs/logs/
-
-# Local AI / agent config (public-repo hygiene)
-.cursor/
-.claude/
-.agents/
-.agent/
-
-# Editor / OS
-.DS_Store
-*.swp
-*~
-.~lock.*
-
-# Quarto / LaTeX build artefacts
-manuscript/.quarto/
-*_files/
-*.aux
-*.bbl
-*.blg
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-
-# Manual data drops: only READMEs and our own derived WITS files are versioned.
-# Never commit third-party raw data (BACI, CEPII, Hofstede) — licences restrict redistribution.
+# Third-party manual drops: only READMEs are versioned
+# (licences of BACI, CEPII and Hofstede restrict redistribution)
 data/manual/baci/*
 !data/manual/baci/README.md
 data/manual/cepii_gravity/*
@@ -58,13 +46,20 @@ data/manual/cepii_gravity/*
 data/manual/hofstede/*
 !data/manual/hofstede/README.md
 
-# Manuscript and LaTeX never live in this repo (manuscript is in ../manuscript/)
-manuscript/
+# Run logs
+outputs/logs/
+
+# Never in this repo, wherever they appear
 *.tex
 *.bib
 *.cls
 *.sty
-
-# Internal planning docs (design spec, agent prompts, review notes): local only
-SPEC.md
-PROMPTS.md
+*.docx
+*.xlsx
+*.pdf
+*.ipynb
+.env
+.DS_Store
+*.swp
+*~
+.~lock.*
