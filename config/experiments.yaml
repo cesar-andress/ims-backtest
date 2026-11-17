@@ -1,0 +1,34 @@
+# Experiment grid: normalization × MCDM × weights (SPEC §3.4).
+normalizations:
+  - ratio_legacy
+  - minmax
+  - zscore
+  - rank
+  - log_minmax
+
+mcdm_methods:
+  - wsm
+  - topsis
+  - vikor
+  - promethee_ii
+
+weight_schemes:
+  - expert_mean
+  - equal
+  - entropy
+  - critic
+  - learned
+
+# Default configuration for the illustrative Colombia case (SPEC §3.5).
+default:
+  normalization: minmax
+  mcdm: wsm
+  weights: expert_mean
+
+# Baselines used in predictive validation (SPEC §3.4).
+baselines:
+  - import_volume
+  - eoc
+  - equal_weights
+  - gravity_ppml
+  - random

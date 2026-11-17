@@ -1,0 +1,50 @@
+# Virtual environments
+.venv/
+venv/
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Data (immutable downloads and derived; keep manual README)
+data/raw/
+data/interim/
+data/processed/
+*.parquet
+
+# Outputs logs (tables/figures may be committed later when generated)
+outputs/logs/
+
+# Local AI / agent config (public-repo hygiene)
+.cursor/
+.claude/
+.agents/
+.agent/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.~lock.*
+
+# Quarto / LaTeX build artefacts
+manuscript/.quarto/
+*_files/
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz

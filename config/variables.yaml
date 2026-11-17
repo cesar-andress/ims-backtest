@@ -1,0 +1,209 @@
+# Criteria variables (SPEC §3.2). direction: benefit|cost; transform: none|log|log1p.
+factors:
+  - demand
+  - cost_access
+  - logistics
+  - competition
+  - product_fit
+  - macro_risk
+  - institutional
+  - openness_legacy
+
+variables:
+  - id: IMPV
+    name: HS chapter imports (USD)
+    factor: demand
+    direction: benefit
+    source: BACI
+    code: value
+    transform: log
+    origin_specific: false
+    unit: USD
+    notes: Aggregate destination imports of the chapter.
+
+  - id: IMPC
+    name: HS chapter imports per capita
+    factor: demand
+    direction: benefit
+    source: BACI+WB
+    code: value/SP.POP.TOTL
+    transform: log
+    origin_specific: false
+    unit: USD per capita
+    notes: BACI import value divided by World Bank population.
+
+  - id: GRW
+    name: HS chapter import growth (3-year CAGR)
+    factor: demand
+    direction: benefit
+    source: BACI
+    code: cagr_3y
+    transform: none
+    origin_specific: false
+    unit: share
+    notes: Uses years t-3..t only (anti-leakage).
+
+  - id: GDPPC
+    name: GDP per capita PPP
+    factor: demand
+    direction: benefit
+    source: WB
+    code: NY.GDP.PCAP.PP.KD
+    transform: log
+    origin_specific: false
+    unit: constant international USD
+    notes: ""
+
+  - id: DIST
+    name: Population-weighted distance
+    factor: cost_access
+    direction: cost
+    source: CEPII Gravity
+    code: distw_harmonic
+    transform: log
+    origin_specific: true
+    unit: km
+    notes: Fall back to distw if distw_harmonic unavailable.
+
+  - id: TARIF
+    name: Applied preferential tariff (AHS), origin to destination
+    factor: cost_access
+    direction: cost
+    source: WITS/TRAINS
+    code: AHS
+    transform: none
+    origin_specific: true
+    unit: percent
+    notes: Preferential applied rates for the HS chapter; not MFN.
+
+  - id: FTA
+    name: Preferential trade agreement in force
+    factor: cost_access
+    direction: benefit
+    source: CEPII Gravity
+    code: fta_wto
+    transform: none
+    origin_specific: true
+    unit: binary
+    notes: ""
+
+  - id: LPI
+    name: Logistics Performance Index (overall)
+    factor: logistics
+    direction: benefit
+    source: WB
+    code: LP.LPI.OVRL.XQ
+    transform: none
+    origin_specific: false
+    unit: index
+    notes: Interpolate between editions; flag imputed years.
+
+  - id: ASIASH
+    name: China+Vietnam share of destination HS imports
+    factor: competition
+    direction: cost
+    source: BACI
+    code: chn_vnm_share
+    transform: none
+    origin_specific: false
+    unit: share
+    notes: ""
+
+  - id: HHI
+    name: Supplier concentration (HHI) in destination HS imports
+    factor: competition
+    direction: cost
+    source: BACI
+    code: hhi_suppliers
+    transform: none
+    origin_specific: false
+    unit: index
+    notes: ""
+
+  - id: UVGAP
+    name: Absolute log unit-value gap (destination imports vs origin exports)
+    factor: product_fit
+    direction: cost
+    source: BACI
+    code: uv_gap
+    transform: none
+    origin_specific: true
+    unit: log USD per ton
+    notes: "abs(log UV_j imports - log UV_i world exports) for the chapter."
+
+  - id: CULT
+    name: Cultural distance (Kogut-Singh, Hofstede 6 dimensions)
+    factor: product_fit
+    direction: cost
+    source: Hofstede
+    code: kogut_singh_6
+    transform: none
+    origin_specific: true
+    unit: index
+    notes: Manual dataset under data/manual/hofstede/.
+
+  - id: LANG
+    name: Common official language
+    factor: product_fit
+    direction: benefit
+    source: CEPII Gravity
+    code: comlang_off
+    transform: none
+    origin_specific: true
+    unit: binary
+    notes: ""
+
+  - id: INFL
+    name: Inflation deviation from 2 percent
+    factor: macro_risk
+    direction: cost
+    source: WB
+    code: FP.CPI.TOTL.ZG
+    transform: none
+    origin_specific: false
+    unit: percentage points
+    notes: Stored/used as |cpi - 2|.
+
+  - id: UNEMP
+    name: Unemployment rate
+    factor: macro_risk
+    direction: cost
+    source: WB
+    code: SL.UEM.TOTL.ZS
+    transform: none
+    origin_specific: false
+    unit: percent
+    notes: ""
+
+  - id: GOV
+    name: Mean Worldwide Governance Indicators
+    factor: institutional
+    direction: benefit
+    source: WB WGI
+    code: VA.EST,PV.EST,GE.EST,RQ.EST,RL.EST,CC.EST
+    transform: none
+    origin_specific: false
+    unit: estimate
+    notes: Mean of six WGI estimate series; document VIF with other macros.
+
+  - id: EOC
+    name: External Opening Coefficient (trade/GDP)
+    factor: openness_legacy
+    direction: benefit
+    source: WB
+    code: NE.TRD.GNFS.ZS
+    transform: none
+    origin_specific: false
+    unit: percent of GDP
+    notes: Legacy/baseline only; biased toward hubs and small economies.
+
+  - id: REEXP
+    name: Re-export intensity (chapter X_j / M_j)
+    factor: openness_legacy
+    direction: cost
+    source: BACI
+    code: reexport_ratio
+    transform: none
+    origin_specific: false
+    unit: ratio
+    notes: Hub flag treated as cost in the core score; SPEC §3.2.

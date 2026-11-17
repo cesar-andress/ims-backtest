@@ -1,0 +1,49 @@
+# Empirical units and run settings (SPEC §3.1, §3.3).
+origins:
+  - COL
+  - PER
+  - MEX
+  - CHL
+  - ECU
+  - BRA
+  - ARG
+
+n_destinations: 60
+
+hs_chapters:
+  primary: "64"
+  robustness:
+    - "61"
+    - "62"
+    - "42"
+    - "09"
+
+years:
+  start: 2012
+  end: 2023
+
+horizons:
+  - 1
+  - 3
+
+entry_threshold_usd: 50000
+
+seed: 42
+
+baci:
+  nomenclature: HS12
+  # URL left empty until Phase 2 configures a verified CEPII endpoint.
+  url: ""
+  version: ""
+
+cepii_gravity:
+  url: ""
+  version: ""
+
+smaa:
+  n_samples: 10000
+  seed: 42
+
+bootstrap:
+  n_reps: 2000
+  seed: 42
