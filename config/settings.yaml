@@ -30,15 +30,30 @@ entry_threshold_usd: 50000
 
 seed: 42
 
+# CEPII BACI — URL verified against cepii.fr DATA_DOWNLOAD (HTTP 200, 2026-11-17).
+# Update url/version together when CEPII publishes a new release.
 baci:
   nomenclature: HS12
-  # URL left empty until Phase 2 configures a verified CEPII endpoint.
-  url: ""
-  version: ""
+  version: "202601"
+  url: "https://www.cepii.fr/DATA_DOWNLOAD/baci/data/BACI_HS12_V202601.zip"
 
+# CEPII Gravity — CSV zip verified against cepii.fr DATA_DOWNLOAD (HTTP 200, 2026-11-17).
 cepii_gravity:
-  url: ""
-  version: ""
+  version: "202211"
+  url: "https://www.cepii.fr/DATA_DOWNLOAD/gravity/data/Gravity_csv_V202211.zip"
+
+# WITS TradeStats tariff SDMX (AHS simple average). Chapter-level product codes
+# are not exposed as a single key; API attempts use product=Total as a probe and
+# prefer human CSV exports under data/manual/wits/ for HS-chapter AHS averages.
+wits:
+  version: "trains-ahs"
+  base_url: "https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_TradeStats_Tariff"
+  indicator: "AHS-SMPL-AVRG"
+  product: "Total"
+
+worldbank:
+  wdi_source_id: 2
+  wgi_source_id: 3
 
 smaa:
   n_samples: 10000

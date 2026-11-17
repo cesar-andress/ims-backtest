@@ -81,6 +81,20 @@ class SourceRefSettings(BaseModel):
     nomenclature: str | None = None
 
 
+class WitsSettings(BaseModel):
+    version: str = "trains-ahs"
+    base_url: str = (
+        "https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_TradeStats_Tariff"
+    )
+    indicator: str = "AHS-SMPL-AVRG"
+    product: str = "Total"
+
+
+class WorldBankSettings(BaseModel):
+    wdi_source_id: int = 2
+    wgi_source_id: int = 3
+
+
 class SmaaSettings(BaseModel):
     n_samples: int = 10_000
     seed: int = 42
@@ -101,8 +115,15 @@ class Settings(BaseModel):
     seed: int = 42
     baci: SourceRefSettings = Field(default_factory=SourceRefSettings)
     cepii_gravity: SourceRefSettings = Field(default_factory=SourceRefSettings)
+    wits: WitsSettings = Field(default_factory=WitsSettings)
+    worldbank: WorldBankSettings = Field(default_factory=WorldBankSettings)
     smaa: SmaaSettings = Field(default_factory=SmaaSettings)
     bootstrap: BootstrapSettings = Field(default_factory=BootstrapSettings)
+
+    def hs_chapter_codes(self) -> list[str]:
+        """Unique HS chapter codes (primary + robustness), zero-padded to 2 digits."""
+        codes = [self.hs_chapters.primary, *self.hs_chapters.robustness]
+        return sorted({str(c).zfill(2) for c in codes})
 
     @field_validator("origins")
     @classmethod

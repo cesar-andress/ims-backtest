@@ -12,10 +12,26 @@ app = typer.Typer(
 
 
 @app.command()
-def download() -> None:
-    """Download official data sources into data/raw/ (stub)."""
-    typer.echo("download: not implemented yet (Phase 2)")
-    raise typer.Exit(code=1)
+def download(
+    force: bool = typer.Option(False, "--force", help="Re-download even if manifest matches"),
+    report: bool = typer.Option(
+        False, "--report", help="Only write coverage.md from existing data/raw"
+    ),
+) -> None:
+    """Download official data sources into data/raw/ and update the manifest."""
+    from imsfe.download import run_download
+
+    result = run_download(force=force, report_only=report)
+    typer.echo(f"coverage -> {result['coverage_path']}")
+    for source, info in result["status"].items():
+        if not info:
+            continue
+        if info.get("error"):
+            typer.echo(f"  {source}: ERROR {info['error']}")
+        elif info.get("skipped"):
+            typer.echo(f"  {source}: skipped")
+        else:
+            typer.echo(f"  {source}: ok")
 
 
 @app.command()
