@@ -1,31 +1,31 @@
-iso3,tariff_pct,source
-ARE,,
-AUS,,
-AUT,,
-BEL,,
-CAN,,
-CHE,,
-CHN,,
-CZE,,
-DEU,,
-DNK,,
-ESP,,
-FRA,,
-GBR,,
-ITA,,
-JPN,,
-KOR,,
-MEX,,
-NLD,,
-PAN,,
-POL,,
-PRT,,
-ROU,,
-RUS,,
-SAU,,
-SGP,,
-SVK,,
-SWE,,
-TUR,,
-USA,,
-VNM,,
+iso3,tariff_pct,source,tariff_type,year,wits_reporter,partner,datatype,n_hs6,notes
+ARE,5.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/784/partner/000/product/all/year/2023/datatype/reported",MFN,2023,ARE,WORLD(MFN),reported,25,GCC common external tariff; no agreement with Colombia.
+AUS,3.63,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/036/partner/000/product/all/year/2023/datatype/reported",MFN,2023,AUS,WORLD(MFN),reported,25,No preferential agreement with Colombia.
+AUT,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+BEL,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+CAN,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/124/partner/170/product/all/year/2021/datatype/reported",PREF,2021,CAN,COL,reported,22,Canada-Colombia FTA.
+CHE,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/756/partner/170/product/all/year/2021/datatype/reported",PREF,2021,CHE,COL,reported,25,EFTA-Colombia FTA.
+CHN,9.36,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/156/partner/000/product/all/year/2023/datatype/reported",MFN,2023,CHN,WORLD(MFN),reported,25,No preferential agreement with Colombia.
+CZE,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+DEU,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+DNK,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+ESP,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+FRA,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+GBR,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/826/partner/170/product/all/year/2021/datatype/reported",PREF,2021,GBR,COL,reported,22,UK-Andean Trade Agreement.
+ITA,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+JPN,29.74,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/392/partner/000/product/all/year/2023/datatype/aveestimated",MFN_AVE,2023,JPN,WORLD(MFN),aveestimated,25,No EPA in force. Ad-valorem equivalents used because 25 of 99 lines are specific/compound duties (reported ad-valorem-only average would be 16.32). Japanese GSP not considered. Leather footwear is under tariff-rate quota.
+KOR,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/410/partner/170/product/all/year/2021/datatype/reported",PREF,2021,KOR,COL,reported,25,Korea-Colombia FTA.
+MEX,8.03,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/484/partner/170/product/all/year/2018/datatype/reported",PREF_PARTIAL,2018,MEX,COL,reported,18,"MANUAL CHECK: latest WITS line data (2018) shows preference on only ~30% of national lines, MFN on the rest; WITS AVE-estimated 2017 file reports 0.0. Verify current Colombia-Mexico schedule (Pacific Alliance Additional Protocol) before using."
+NLD,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+PAN,9.61,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/591/partner/000/product/all/year/2023/datatype/reported",MFN,2023,PAN,WORLD(MFN),reported,25,No Colombia-Panama FTA in force. MANUAL CHECK: WITS 2013 shows partial preference for COL (simple avg 7.79) under an older partial-scope agreement; no later preferential data.
+POL,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+PRT,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+ROU,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+RUS,4.81,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/643/partner/000/product/all/year/2021/datatype/aveestimated",MFN_AVE,2021,RUS,WORLD(MFN),aveestimated,25,"EAEU common tariff; 71 of 79 lines specific/compound, so ad-valorem equivalents used (ad-valorem-only average would be a misleading 0.0). Latest year available in WITS."
+SAU,7.08,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/682/partner/000/product/all/year/2023/datatype/reported",MFN,2023,SAU,WORLD(MFN),reported,25,No agreement with Colombia.
+SGP,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/702/partner/000/product/all/year/2023/datatype/reported",MFN,2023,SGP,WORLD(MFN),reported,25,Singapore applies zero duties on footwear.
+SVK,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+SWE,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/918/partner/170/product/all/year/2021/datatype/reported",PREF,2021,EUN,COL,reported,25,EU-Colombia/Peru/Ecuador Trade Agreement; EU reported as a single customs territory (WITS reporter 918).
+TUR,39.33,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/792/partner/000/product/all/year/2023/datatype/reported",MFN,2023,TUR,WORLD(MFN),reported,25,Colombia-Turkey FTA signed but not in force. Turkey applies high duties (incl. additional duties) on footwear from non-FTA origins.
+USA,0.00,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/840/partner/170/product/all/year/2021/datatype/reported",PREF,2021,USA,COL,reported,21,US-Colombia TPA.
+VNM,28.43,"WITS-TRAINS API, accessed 2026-11-17: https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/704/partner/000/product/all/year/2023/datatype/reported",MFN,2023,VNM,WORLD(MFN),reported,25,No preferential agreement with Colombia.

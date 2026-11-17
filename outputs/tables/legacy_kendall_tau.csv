@@ -2,3 +2,4 @@ method,kendall_tau_vs_ratio_legacy,p_value
 ratio_legacy,1.000000,0.000000
 minmax,0.806897,0.000000
 rank,0.760920,0.000000
+minmax_pref_tariff,0.797701,0.000000

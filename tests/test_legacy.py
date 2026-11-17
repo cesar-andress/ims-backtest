@@ -52,9 +52,18 @@ def test_cptr_austria_equals_australia(legacy_result: dict) -> None:
     assert raw.loc["AUT", "CPTR"] == raw.loc["AUS", "CPTR"] == 9_375_992
 
 
-def test_preferential_tariffs_refuse_when_empty() -> None:
+def test_preferential_tariffs_refuse_when_empty(tmp_path: Path) -> None:
+    empty = tmp_path / "tariffs.csv"
+    empty.write_text("iso3,tariff_pct,source\nUSA,,\nCHE,,\n", encoding="utf-8")
     with pytest.raises(ValueError, match="Preferential tariffs are incomplete"):
-        load_preferential_tariffs()
+        load_preferential_tariffs(empty)
+
+
+def test_preferential_tariffs_file_complete() -> None:
+    tariffs = load_preferential_tariffs()
+    assert len(tariffs) == 30
+    assert tariffs.notna().all()
+    assert (tariffs >= 0).all()
 
 
 def test_audit_and_comparison_written(legacy_result: dict) -> None:
