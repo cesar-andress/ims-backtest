@@ -48,3 +48,19 @@ manuscript/.quarto/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# Manual data drops: only READMEs and our own derived WITS files are versioned.
+# Never commit third-party raw data (BACI, CEPII, Hofstede) — licences restrict redistribution.
+data/manual/baci/*
+!data/manual/baci/README.md
+data/manual/cepii_gravity/*
+!data/manual/cepii_gravity/README.md
+data/manual/hofstede/*
+!data/manual/hofstede/README.md
+
+# Manuscript and LaTeX never live in this repo (manuscript is in ../manuscript/)
+manuscript/
+*.tex
+*.bib
+*.cls
+*.sty

@@ -1,0 +1,13 @@
+{
+  "title": "ims-backtest: a reproducible and validated international market selection framework (IMSFE 2.0)",
+  "upload_type": "software",
+  "description": "<p>Open, reproducible pipeline to build international market selection (IMS) indices from official data (World Bank, CEPII BACI and Gravity, WITS-TRAINS), aggregate them with multi-criteria methods (WSM, TOPSIS, VIKOR, PROMETHEE II), quantify weight uncertainty (SMAA) and validate them by backtesting against realised bilateral export flows. Includes the reproduction and audit of the original IMSFE technique (Colombia, HS 64 footwear).</p>",
+  "creators": [
+    {"name": "Baena-Rojas, Jose Jaime", "affiliation": "Pontificia Universidad Católica del Perú; Universidad Internacional de La Rioja", "orcid": "0000-0002-0915-4087"},
+    {"name": "Cano, Jose Alejandro", "affiliation": "Universidad de Medellín", "orcid": "0000-0002-2638-5581"},
+    {"name": "Andrés-Sanchez, César", "affiliation": "Universidad Internacional de La Rioja", "orcid": "0009-0001-8968-3404"}
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": ["international market selection", "export decision-making", "multi-criteria decision analysis", "predictive validation", "SMAA", "reproducible research"]
+}

@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software or its derived data, please cite it as below."
+type: software
+title: "ims-backtest: a reproducible and validated international market selection framework (IMSFE 2.0)"
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/cesar-andress/ims-backtest"
+authors:
+  - family-names: Baena-Rojas
+    given-names: Jose Jaime
+    orcid: "https://orcid.org/0000-0002-0915-4087"
+    affiliation: "Pontificia Universidad Católica del Perú; Universidad Internacional de La Rioja"
+  - family-names: Cano
+    given-names: Jose Alejandro
+    orcid: "https://orcid.org/0000-0002-2638-5581"
+    affiliation: "Universidad de Medellín"
+  - family-names: Andrés-Sanchez
+    given-names: César
+    orcid: "https://orcid.org/0009-0001-8968-3404"
+    affiliation: "Universidad Internacional de La Rioja"
+keywords:
+  - international market selection
+  - export decision-making
+  - multi-criteria decision analysis
+  - predictive validation
+  - SMAA
+  - reproducible research

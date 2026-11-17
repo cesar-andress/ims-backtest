@@ -1,4 +1,4 @@
-# IMSFE 2.0
+# ims-backtest (IMSFE 2.0)
 
 Reproducible international market selection (IMS) framework with predictive
 validation, robustness checks, and an open data pipeline. Design decisions live
@@ -8,7 +8,6 @@ in [`SPEC.md`](SPEC.md). Phase prompts for Cursor are in [`PROMPTS.md`](PROMPTS.
 
 - Python 3.11
 - [`uv`](https://github.com/astral-sh/uv)
-- Quarto (manuscript rendering only; not required for `make test`)
 
 ## Install
 
@@ -57,3 +56,18 @@ No fabricated data. Every manuscript number must come from `outputs/` generated
 by code. Features at year *t* may only use information with year ≤ *t*.
 
 Original submission materials under `../old_submission/` are **read-only**.
+
+## Data licences
+
+Raw third-party data (CEPII BACI and Gravity, Hofstede, World Bank, WITS) is
+**not** redistributed here: the pipeline downloads it, or `data/manual/*/README.md`
+explains how to obtain it. Derived files in this repository (e.g. the WITS tariff
+extracts in `data/manual/wits/`) keep the attribution of their original source.
+
+## Citation
+
+See [`CITATION.cff`](CITATION.cff). A Zenodo DOI will be added on the first release.
+
+## License
+
+Code: MIT (see [`LICENSE`](LICENSE)).
