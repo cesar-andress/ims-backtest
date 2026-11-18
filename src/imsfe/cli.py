@@ -155,6 +155,30 @@ def ml(
     typer.echo(result["comparison"].to_string(index=False))
 
 
+@app.command("matrix")
+def matrix_cmd(
+    origin: str = typer.Option("COL", "--origin", "-o"),
+    year: int | None = typer.Option(None, "--year", "-y", help="Default: latest year"),
+    top_n: int = typer.Option(10, "--top-n"),
+) -> None:
+    """Attractiveness × fit strategic matrix (F3) and recommended vs actual table."""
+    from imsfe.matrix import run_case_study
+
+    result = run_case_study(origin=origin, year=year, top_n=top_n)
+    cov = result["coverage"]
+    typer.echo(f"Case {result['origin']} HS{cov['hs_chapter']} {result['year']}")
+    typer.echo(f"attr used={cov['attr_used']} dropped={cov['attr_dropped']}")
+    typer.echo(f"fit  used={cov['fit_used']} dropped={cov['fit_dropped']}")
+    typer.echo(f"matrix  -> {result['matrix_path']}")
+    typer.echo(f"compare -> {result['compare_path']}")
+    typer.echo(f"guide   -> {result['guide_path']}")
+    for kind, path in result["figure_paths"].items():
+        typer.echo(f"F3 ({kind}) -> {path}")
+    cmp_ = result["compare"]
+    typer.echo("Recommended vs actual (export value / 3y log growth):")
+    typer.echo(cmp_.to_string(index=False))
+
+
 @app.command()
 def report() -> None:
     """Generate tables and figures under outputs/ (stub)."""

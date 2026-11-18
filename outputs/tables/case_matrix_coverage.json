@@ -1,0 +1,59 @@
+{
+  "origin": "COL",
+  "year": 2023,
+  "hs_chapter": "64",
+  "n_destinations": 55,
+  "attr_used": [
+    "IMPV",
+    "IMPC",
+    "GRW",
+    "GDPPC",
+    "GOV"
+  ],
+  "attr_dropped": [
+    "LPI",
+    "INFL",
+    "UNEMP"
+  ],
+  "fit_used": [
+    "UVGAP",
+    "LANG",
+    "DIST",
+    "FTA"
+  ],
+  "fit_dropped": [
+    "CULT",
+    "TARIF"
+  ],
+  "attr_cut_median": 5.76262451180148,
+  "fit_cut_median": 4.616338716866438,
+  "locf_fit": {
+    "DIST": {
+      "n_filled": 55,
+      "n_missing_before": 60,
+      "source_year_min": 2021,
+      "source_year_max": 2021
+    },
+    "LANG": {
+      "n_filled": 55,
+      "n_missing_before": 60,
+      "source_year_min": 2021,
+      "source_year_max": 2021
+    },
+    "FTA": {
+      "n_filled": 55,
+      "n_missing_before": 60,
+      "source_year_min": 2021,
+      "source_year_max": 2021
+    },
+    "CULT": {
+      "n_filled": 0,
+      "n_missing_before": 60,
+      "source_year_min": null,
+      "source_year_max": null
+    }
+  },
+  "normalization": "minmax",
+  "weights": "expert_mean",
+  "method": "wsm"
+}
