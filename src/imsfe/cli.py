@@ -65,11 +65,26 @@ def build(
 
 @app.command()
 def run(
-    experiment: str = typer.Option("default", "--experiment", "-e", help="Experiment name"),
+    experiment: str = typer.Option(
+        "default",
+        "--experiment",
+        "-e",
+        help="default | grid | method+normalization+weights",
+    ),
 ) -> None:
-    """Run normalisation / MCDM / weight experiment grid (stub)."""
-    typer.echo(f"run: not implemented yet (Phase 4); experiment={experiment}")
-    raise typer.Exit(code=1)
+    """Run normalisation × MCDM × weights grid; write scores and T7."""
+    from imsfe.run_experiments import run_experiments
+
+    result = run_experiments(experiment=experiment)
+    typer.echo(f"scores -> {result['scores_path']} ({result['n_rows']} rows)")
+    typer.echo(f"combos -> {result['n_combos']}")
+    typer.echo(f"T7     -> {result['t7_path']}")
+    typer.echo(
+        f"Top-10 {result['origin']} {result['year']} "
+        f"{result['primary_method']}+{result['primary_normalization']}+{result['primary_weights']}:"
+    )
+    for _, row in result["top10"].iterrows():
+        typer.echo(f"  {int(row['rank']):2d}. {row['dest']}: {row['score']:.4f}")
 
 
 @app.command()
