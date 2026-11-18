@@ -1,6 +1,6 @@
 imsfe_factor,weight,legacy_map
-macro_risk,0.11500000000000002,ECON
 product_fit,0.0925,CULT
+macro_risk,0.11500000000000002,ECON
 institutional,0.098,POLI
 competition,0.14500000000000002,COMM
 logistics,0.1385,LOGI

@@ -2,8 +2,8 @@
 
 | imsfe_factor    |   weight | legacy_map       |
 |:----------------|---------:|:-----------------|
-| macro_risk      |   0.115  | ECON             |
 | product_fit     |   0.0925 | CULT             |
+| macro_risk      |   0.115  | ECON             |
 | institutional   |   0.098  | POLI             |
 | competition     |   0.145  | COMM             |
 | logistics       |   0.1385 | LOGI             |
@@ -22,8 +22,8 @@
 \toprule
 imsfe\_factor & weight & legacy\_map \\
 \midrule
-macro\_risk & 0.1150 & ECON \\
 product\_fit & 0.0925 & CULT \\
+macro\_risk & 0.1150 & ECON \\
 institutional & 0.0980 & POLI \\
 competition & 0.1450 & COMM \\
 logistics & 0.1385 & LOGI \\

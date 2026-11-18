@@ -7,7 +7,7 @@
     "subsample": 0.9,
     "colsample_bytree": 0.9
   },
-  "runtime_sec": 2.188954796998587,
+  "runtime_sec": 2.197641184000531,
   "seed": 42,
   "n_train_int": 979,
   "n_train_ext": 2520,

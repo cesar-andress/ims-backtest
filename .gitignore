@@ -52,6 +52,7 @@ outputs/logs/*
 !outputs/logs/build.json
 !outputs/logs/refs_check.md
 !outputs/logs/refs_check.json
+!outputs/logs/repro_check.md
 
 # Never in this repo, wherever they appear
 *.tex

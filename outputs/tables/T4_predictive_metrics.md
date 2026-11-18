@@ -12,7 +12,7 @@
 | vikor|minmax|expert_mean        | ndcg@10      |  0.752 |      0.709 |       0.794 |         28 |
 | wsm|minmax|equal                | ndcg@10      |  0.75  |      0.7   |       0.799 |         28 |
 | wsm|minmax|expert_mean          | ndcg@10      |  0.758 |      0.709 |       0.806 |         28 |
-| wsm|minmax|learned              | ndcg@10      |  0.761 |      0.716 |       0.806 |         28 |
+| wsm|minmax|learned              | ndcg@10      |  0.755 |      0.707 |       0.799 |         28 |
 | eoc                             | spearman     | -0.051 |     -0.179 |       0.072 |         28 |
 | equal_weights                   | spearman     |  0.031 |     -0.116 |       0.183 |         28 |
 | gravity_ppml                    | spearman     |  0.129 |      0.005 |       0.251 |         28 |
@@ -23,7 +23,7 @@
 | vikor|minmax|expert_mean        | spearman     |  0.071 |     -0.065 |       0.202 |         28 |
 | wsm|minmax|equal                | spearman     |  0.031 |     -0.129 |       0.177 |         28 |
 | wsm|minmax|expert_mean          | spearman     |  0.057 |     -0.086 |       0.202 |         28 |
-| wsm|minmax|learned              | spearman     |  0.053 |     -0.088 |       0.18  |         28 |
+| wsm|minmax|learned              | spearman     |  0.086 |     -0.052 |       0.222 |         28 |
 | eoc                             | precision@10 |  0.704 |      0.586 |       0.807 |         28 |
 | equal_weights                   | precision@10 |  0.743 |      0.625 |       0.854 |         28 |
 | gravity_ppml                    | precision@10 |  0.711 |      0.596 |       0.821 |         28 |
@@ -34,7 +34,7 @@
 | vikor|minmax|expert_mean        | precision@10 |  0.75  |      0.636 |       0.843 |         28 |
 | wsm|minmax|equal                | precision@10 |  0.743 |      0.625 |       0.847 |         28 |
 | wsm|minmax|expert_mean          | precision@10 |  0.75  |      0.636 |       0.857 |         28 |
-| wsm|minmax|learned              | precision@10 |  0.736 |      0.614 |       0.843 |         28 |
+| wsm|minmax|learned              | precision@10 |  0.746 |      0.625 |       0.85  |         28 |
 | eoc                             | auc          |  0.409 |      0.318 |       0.496 |         24 |
 | equal_weights                   | auc          |  0.521 |      0.423 |       0.615 |         24 |
 | gravity_ppml                    | auc          |  0.512 |      0.421 |       0.597 |         24 |
@@ -45,7 +45,7 @@
 | vikor|minmax|expert_mean        | auc          |  0.539 |      0.44  |       0.636 |         24 |
 | wsm|minmax|equal                | auc          |  0.521 |      0.426 |       0.611 |         24 |
 | wsm|minmax|expert_mean          | auc          |  0.509 |      0.408 |       0.6   |         24 |
-| wsm|minmax|learned              | auc          |  0.504 |      0.411 |       0.595 |         24 |
+| wsm|minmax|learned              | auc          |  0.526 |      0.425 |       0.621 |         24 |
 | ml_gbm                          | ndcg@10      |  0.749 |      0.699 |       0.794 |         28 |
 | ml_gbm                          | spearman     |  0.106 |     -0.007 |       0.212 |         28 |
 | ml_gbm                          | precision@10 |  0.689 |      0.553 |       0.807 |         28 |
@@ -72,7 +72,7 @@ topsis|minmax|expert\_mean & ndcg@10 & 0.763 & 0.716 & 0.808 & 28 \\
 vikor|minmax|expert\_mean & ndcg@10 & 0.752 & 0.709 & 0.794 & 28 \\
 wsm|minmax|equal & ndcg@10 & 0.750 & 0.700 & 0.799 & 28 \\
 wsm|minmax|expert\_mean & ndcg@10 & 0.758 & 0.709 & 0.806 & 28 \\
-wsm|minmax|learned & ndcg@10 & 0.761 & 0.716 & 0.806 & 28 \\
+wsm|minmax|learned & ndcg@10 & 0.755 & 0.707 & 0.799 & 28 \\
 eoc & spearman & -0.051 & -0.179 & 0.072 & 28 \\
 equal\_weights & spearman & 0.031 & -0.116 & 0.183 & 28 \\
 gravity\_ppml & spearman & 0.129 & 0.005 & 0.251 & 28 \\
@@ -83,7 +83,7 @@ topsis|minmax|expert\_mean & spearman & 0.055 & -0.085 & 0.186 & 28 \\
 vikor|minmax|expert\_mean & spearman & 0.071 & -0.065 & 0.202 & 28 \\
 wsm|minmax|equal & spearman & 0.031 & -0.129 & 0.177 & 28 \\
 wsm|minmax|expert\_mean & spearman & 0.057 & -0.086 & 0.202 & 28 \\
-wsm|minmax|learned & spearman & 0.053 & -0.088 & 0.180 & 28 \\
+wsm|minmax|learned & spearman & 0.086 & -0.052 & 0.222 & 28 \\
 eoc & precision@10 & 0.704 & 0.586 & 0.807 & 28 \\
 equal\_weights & precision@10 & 0.743 & 0.625 & 0.854 & 28 \\
 gravity\_ppml & precision@10 & 0.711 & 0.596 & 0.821 & 28 \\
@@ -94,7 +94,7 @@ topsis|minmax|expert\_mean & precision@10 & 0.746 & 0.632 & 0.850 & 28 \\
 vikor|minmax|expert\_mean & precision@10 & 0.750 & 0.636 & 0.843 & 28 \\
 wsm|minmax|equal & precision@10 & 0.743 & 0.625 & 0.847 & 28 \\
 wsm|minmax|expert\_mean & precision@10 & 0.750 & 0.636 & 0.857 & 28 \\
-wsm|minmax|learned & precision@10 & 0.736 & 0.614 & 0.843 & 28 \\
+wsm|minmax|learned & precision@10 & 0.746 & 0.625 & 0.850 & 28 \\
 eoc & auc & 0.409 & 0.318 & 0.496 & 24 \\
 equal\_weights & auc & 0.521 & 0.423 & 0.615 & 24 \\
 gravity\_ppml & auc & 0.512 & 0.421 & 0.597 & 24 \\
@@ -105,7 +105,7 @@ topsis|minmax|expert\_mean & auc & 0.518 & 0.424 & 0.609 & 24 \\
 vikor|minmax|expert\_mean & auc & 0.539 & 0.440 & 0.636 & 24 \\
 wsm|minmax|equal & auc & 0.521 & 0.426 & 0.611 & 24 \\
 wsm|minmax|expert\_mean & auc & 0.509 & 0.408 & 0.600 & 24 \\
-wsm|minmax|learned & auc & 0.504 & 0.411 & 0.595 & 24 \\
+wsm|minmax|learned & auc & 0.526 & 0.425 & 0.621 & 24 \\
 ml\_gbm & ndcg@10 & 0.749 & 0.699 & 0.794 & 28 \\
 ml\_gbm & spearman & 0.106 & -0.007 & 0.212 & 28 \\
 ml\_gbm & precision@10 & 0.689 & 0.553 & 0.807 & 28 \\
