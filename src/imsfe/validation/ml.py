@@ -56,7 +56,14 @@ def _load_learned_weights_for_compare() -> Weights | None:
 
 
 def detect_backend(seed: int = 42) -> Backend:
-    """Prefer XGBoost+CUDA; fall back to LightGBM CPU."""
+    """Default to LightGBM CPU for published numbers.
+
+    Set ``IMSFE_ALLOW_CUDA=1`` to optionally try XGBoost+CUDA.
+    """
+    import os
+
+    if os.environ.get("IMSFE_ALLOW_CUDA", "").strip() not in {"1", "true", "TRUE", "yes"}:
+        return "lightgbm_cpu"
     try:
         from xgboost import XGBRegressor
 

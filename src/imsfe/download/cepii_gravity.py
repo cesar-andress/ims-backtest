@@ -126,7 +126,21 @@ def convert_gravity(archive: Path, settings: Settings) -> Path:
         (out["year"] >= settings.years.start) & (out["year"] <= settings.years.end)
     ].copy()
 
-    # Prefer harmonic distance when present; always keep distw if available.
+    # CEPII occasionally emits duplicate (o,d,year) shells (e.g. DEU). Prefer the
+    # row with the most non-null covariates, then drop remaining duplicates.
+    key = ["iso3_o", "iso3_d", "year"]
+    score_cols = [
+        c
+        for c in ("distw_harmonic", "distw", "contig", "comlang_off", "fta_wto")
+        if c in out.columns
+    ]
+    if score_cols:
+        out["_nnz"] = out[score_cols].notna().sum(axis=1)
+        out = out.sort_values(key + ["_nnz"], ascending=[True, True, True, False])
+        out = out.drop_duplicates(key, keep="first").drop(columns=["_nnz"])
+    else:
+        out = out.drop_duplicates(key, keep="first")
+
     path = raw_dir() / GRAVITY_PARQUET_REL
     path.parent.mkdir(parents=True, exist_ok=True)
     out.to_parquet(path, index=False)

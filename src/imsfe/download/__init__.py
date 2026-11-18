@@ -33,15 +33,19 @@ def run_download(*, force: bool = False, report_only: bool = False) -> dict[str,
             ("baci", fetch_baci),
             ("cepii_gravity", fetch_cepii_gravity),
             ("wits", fetch_wits),
-            ("hofstede", fetch_hofstede),
         ]:
             try:
-                if name == "hofstede":
-                    status[name] = fn(force=force)
-                else:
-                    status[name] = fn(settings, force=force)
+                status[name] = fn(settings, force=force)
             except Exception as exc:  # noqa: BLE001 — continue other sources
                 status[name] = {"error": str(exc)}
+
+        # Hofstede is required for CULT — fail loudly if the manual CSV is absent.
+        try:
+            status["hofstede"] = fetch_hofstede(force=force)
+        except FileNotFoundError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            status["hofstede"] = {"error": str(exc)}
 
     coverage_path = write_coverage_report(settings, status=status)
     return {"status": status, "coverage_path": coverage_path}

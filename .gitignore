@@ -46,6 +46,8 @@ data/manual/cepii_gravity/*
 !data/manual/cepii_gravity/README.md
 data/manual/hofstede/*
 !data/manual/hofstede/README.md
+data/manual/wits/*
+!data/manual/wits/README.md
 
 # Run logs (keep the reproducible build manifest + refs check)
 outputs/logs/*
@@ -53,6 +55,7 @@ outputs/logs/*
 !outputs/logs/refs_check.md
 !outputs/logs/refs_check.json
 !outputs/logs/repro_check.md
+!outputs/logs/coverage.md
 
 # Never in this repo, wherever they appear
 *.tex

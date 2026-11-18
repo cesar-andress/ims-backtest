@@ -31,6 +31,7 @@ import pandas as pd
 from imsfe.build.descriptives import outputs_tables_dir
 from imsfe.build.panel import processed_dir
 from imsfe.config import Settings, VariablesConfig, load_settings, load_variables
+from imsfe.expert_mapping import load_expert_mapping, mapped_legacy_ids
 from imsfe.mcdm import score
 from imsfe.normalize import normalize_matrix
 from imsfe.run_experiments import _directions, _feature_columns, _prepare_slice
@@ -118,16 +119,48 @@ class ExpertWeightStats:
     notes: tuple[str, ...] = field(default_factory=tuple)
 
 
+def _empirical_sd_mapped_in_factor(
+    factor: str,
+    names: list[str],
+    leg_v: dict[str, Any],
+    mapping: dict[str, Any],
+) -> float | None:
+    """Mean expert SD of mapped legacy variables for criteria in ``factor``."""
+    sds: list[float] = []
+    for vid in names:
+        legacy_ids = mapped_legacy_ids(vid, mapping)
+        for lid in legacy_ids:
+            if lid in leg_v and "sd" in leg_v[lid]:
+                sds.append(float(leg_v[lid]["sd"]))
+    if not sds:
+        # Fall back to any legacy vars whose factor label matches LEGACY_FACTOR_MAP
+        legacy_factor = LEGACY_FACTOR_MAP.get(factor)
+        if legacy_factor:
+            for _lid, stats in leg_v.items():
+                if stats.get("factor") == legacy_factor and "sd" in stats:
+                    sds.append(float(stats["sd"]))
+    if not sds:
+        return None
+    return float(np.mean(sds))
+
+
 def build_expert_stats(
     center: Weights,
     *,
     expert_path: Path | None = None,
     default_cv: float = 0.25,
+    unmapped_dispersion: Literal["mapped_factor_sd", "fixed_cv"] = "mapped_factor_sd",
 ) -> ExpertWeightStats:
-    """Attach expert SD/min/max to the centre weights (legacy map when possible)."""
+    """Attach expert SD/min/max to the centre weights (legacy map when possible).
+
+    Unmapped criteria (see ``config/expert_mapping.yaml``) use the empirical SD
+    of mapped expert variables within the same factor when
+    ``unmapped_dispersion='mapped_factor_sd'``; otherwise a fixed CV.
+    """
     expert = load_expert_yaml(expert_path)
     leg_f = expert.get("factors", {})
     leg_v = expert.get("variables", {})
+    mapping = load_expert_mapping()
     notes: list[str] = []
 
     factor_names = list(center.factors.index)
@@ -159,18 +192,32 @@ def build_expert_stats(
         vsig = np.zeros(len(names), dtype=float)
         vmin = np.zeros(len(names), dtype=float)
         vmax = np.zeros(len(names), dtype=float)
+        mapped_sd = _empirical_sd_mapped_in_factor(str(factor), names, leg_v, mapping)
         for j, vid in enumerate(names):
-            if vid in leg_v:
+            legacy_ids = mapped_legacy_ids(vid, mapping)
+            if legacy_ids and all(lid in leg_v for lid in legacy_ids):
+                # Mean SD / min / max across mapped legacy variables
+                vsig[j] = float(np.mean([float(leg_v[lid]["sd"]) for lid in legacy_ids]))
+                vmin[j] = float(np.mean([float(leg_v[lid]["min"]) for lid in legacy_ids]))
+                vmax[j] = float(np.mean([float(leg_v[lid]["max"]) for lid in legacy_ids]))
+            elif vid in leg_v:
                 vsig[j] = float(leg_v[vid]["sd"])
                 vmin[j] = float(leg_v[vid]["min"])
                 vmax[j] = float(leg_v[vid]["max"])
             else:
-                vsig[j] = default_cv * vmu[j]
+                if unmapped_dispersion == "mapped_factor_sd" and mapped_sd is not None:
+                    vsig[j] = float(mapped_sd)
+                    notes.append(
+                        f"{vid}: unmapped; sigma=mean mapped SD in factor "
+                        f"{factor} ({mapped_sd:.4f})"
+                    )
+                else:
+                    vsig[j] = default_cv * vmu[j]
+                    notes.append(
+                        f"{vid}: unmapped; fixed_cv={default_cv} inside {factor}"
+                    )
                 vmin[j] = max(1e-6, vmu[j] - 2 * vsig[j])
                 vmax[j] = min(1.0, vmu[j] + 2 * vsig[j])
-                notes.append(
-                    f"{vid}: no legacy SD; default_cv={default_cv} inside {factor}"
-                )
             if vmax[j] <= vmin[j]:
                 vmax[j] = vmin[j] + 1e-6
         within[str(factor)] = {
@@ -512,24 +559,26 @@ def run_smaa_case(
     raw, normalized, dirs, center = prepare_origin_year_matrices(
         panel, origin, int(year), normalization=normalization
     )
-    stats = build_expert_stats(center)
-    if method == "wsm":
-        result = run_smaa_wsm(
-            normalized,
-            center,
-            stats,
-            n_samples=n_samples,
-            seed=seed,
-            mode=mode,
-            dispersion_scale=dispersion_scale,
-        )
-    else:
-        result = run_smaa_generic(
+    stats = build_expert_stats(center, unmapped_dispersion="mapped_factor_sd")
+    stats_cv = build_expert_stats(center, unmapped_dispersion="fixed_cv")
+
+    def _run(st: ExpertWeightStats):
+        if method == "wsm":
+            return run_smaa_wsm(
+                normalized,
+                center,
+                st,
+                n_samples=n_samples,
+                seed=seed,
+                mode=mode,
+                dispersion_scale=dispersion_scale,
+            )
+        return run_smaa_generic(
             raw,
             normalized,
             dirs,
             center,
-            stats,
+            st,
             method,
             n_samples=n_samples,
             seed=seed,
@@ -537,9 +586,32 @@ def run_smaa_case(
             dispersion_scale=dispersion_scale,
         )
 
+    result = _run(stats)
+    result_cv = _run(stats_cv)
+
     t8 = build_t8(result, top_n=10)
+    t8_cv = build_t8(result_cv, top_n=10)
     t8_path = outputs_tables_dir() / "T8_smaa_col.csv"
     t8.to_csv(t8_path, index=False)
+
+    # Sensitivity of T8 to unmapped dispersion choice
+    sens = t8.merge(
+        t8_cv.rename(
+            columns={
+                c: f"{c}_fixed_cv"
+                for c in t8_cv.columns
+                if c != "dest"
+            }
+        ),
+        on="dest",
+        how="outer",
+    )
+    if "rank" in t8.columns and "rank_fixed_cv" in sens.columns:
+        sens["delta_rank"] = sens["rank"] - sens["rank_fixed_cv"]
+    if "score" in t8.columns and "score_fixed_cv" in sens.columns:
+        sens["delta_score"] = sens["score"] - sens["score_fixed_cv"]
+    sens_path = outputs_tables_dir() / "T8_smaa_unmapped_dispersion_sensitivity.csv"
+    sens.to_csv(sens_path, index=False)
 
     fig_paths = plot_smaa_rank_heatmap(result, top_n=15, stem="F2_smaa_rank_acceptability")
 
@@ -553,10 +625,14 @@ def run_smaa_case(
         "n_samples": n_samples,
         "seed": seed,
         "central_weights": result.central_weights.to_dict(),
+        "unmapped_dispersion": "mapped_factor_sd",
+        "stats_notes": list(stats.notes),
     }
     return {
         "result": result,
         "t8": t8,
+        "t8_sensitivity": sens,
+        "t8_sensitivity_path": sens_path,
         "t8_path": t8_path,
         "figure_paths": fig_paths,
         "summary": summary,

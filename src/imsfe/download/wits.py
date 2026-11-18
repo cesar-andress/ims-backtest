@@ -1,9 +1,23 @@
-"""Load applied preferential tariffs from WITS/TRAINS or manual CSV exports."""
+"""Download applied preferential tariffs from the WITS TRN SDMX API.
+
+Endpoint pattern (World Bank WITS)::
+
+    /API/V1/SDMX/V21/datasource/TRN/reporter/{rep}/partner/{origin}/product/all/year/{y}/datatype/{reported|aveestimated}
+
+Reporters are the destination set (EU members → reporter 918). Partners are the
+configured origins. HS6 lines in configured chapters are aggregated to a simple
+average AHS per (destination, origin, chapter, year). When a product has
+non-ad-valorem lines (``NBR_NA_LINES`` > 0), the ``aveestimated`` observation is
+preferred when available. Missing years can be filled by LOCF with an explicit
+``tarif_locf`` flag.
+"""
 
 from __future__ import annotations
 
-import re
+import time
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -11,211 +25,506 @@ import pandas as pd
 import requests
 
 from imsfe.config import Settings, load_settings
-from imsfe.io import manual_dir, raw_dir, record_artifact, sha256_file, should_skip
+from imsfe.download.iso_codes import (
+    EU27_ISO3,
+    wits_partner_code,
+    wits_reporter_code,
+)
+from imsfe.io import raw_dir, record_artifact, sha256_file, should_skip
 
 WITS_PARQUET_REL = "wits/ahs_tariffs.parquet"
+TRN_DEFAULT_BASE = "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN"
 
 
-def _manual_csv_paths() -> list[Path]:
-    folder = manual_dir() / "wits"
-    return sorted(folder.glob("*.csv"))
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
 
 
-def _try_normalize_wits_csv(path: Path) -> pd.DataFrame | None:
-    """Return a normalized frame if ``path`` matches the documented schema."""
-    required = {"reporter_iso3", "partner_iso3", "year", "hs_chapter", "ahs_simple_avg"}
-    df = pd.read_csv(path)
-    cols = {c.lower(): c for c in df.columns}
-    aliases = {
-        "reporter_iso3": ["reporter_iso3", "reporter", "reportercode"],
-        "partner_iso3": ["partner_iso3", "partner", "partnercode"],
-        "year": ["year", "period", "time"],
-        "hs_chapter": ["hs_chapter", "chapter"],
-        "ahs_simple_avg": [
-            "ahs_simple_avg",
-            "ahs",
-            "dutyvalue",
-            "simpleaverage",
-            "simple_avg_pct",
-        ],
-    }
-    if required.issubset(cols):
-        out = df.rename(columns={cols[c]: c for c in required})
-    else:
-        mapped: dict[str, str] = {}
-        for canon, alist in aliases.items():
-            for a in alist:
-                if a in cols:
-                    mapped[canon] = cols[a]
-                    break
-        if set(mapped) < required:
-            return None
-        out = df.rename(columns={mapped[k]: k for k in required})
-    out = out[list(required)].copy()
-    out["year"] = pd.to_numeric(out["year"], errors="coerce").astype("Int64")
-    out["ahs_simple_avg"] = pd.to_numeric(out["ahs_simple_avg"], errors="coerce")
-    out["hs_chapter"] = out["hs_chapter"].astype(str).str.zfill(2)
-    out = out.dropna(subset=["year", "ahs_simple_avg"])
-    out["year"] = out["year"].astype(int)
-    return out
+def trn_url(
+    reporter: str,
+    partner: str,
+    year: int,
+    datatype: str,
+    *,
+    base_url: str = TRN_DEFAULT_BASE,
+) -> str:
+    """Build a WITS TRN StructureSpecific SDMX URL."""
+    base = base_url.rstrip("/")
+    return (
+        f"{base}/reporter/{reporter}/partner/{partner}/product/all/"
+        f"year/{int(year)}/datatype/{datatype}"
+    )
 
 
-def load_manual_wits_csvs(paths: list[Path] | None = None) -> pd.DataFrame:
-    """Load human WITS exports. Required columns documented in data/manual/wits/README.md."""
-    files = paths if paths is not None else _manual_csv_paths()
-    if not files:
-        raise FileNotFoundError(
-            f"No WITS CSV exports in {manual_dir() / 'wits'}/. "
-            "See data/manual/wits/README.md for export settings."
+def cache_path_for_url(url: str, *, cache_dir: Path | None = None) -> Path:
+    """Deterministic cache path under ``data/raw/wits/`` for a TRN URL."""
+    root = cache_dir or (raw_dir() / "wits")
+    # reporter/partner/year/datatype from URL tail
+    parts = url.rstrip("/").split("/")
+    try:
+        rep = parts[parts.index("reporter") + 1]
+        partner = parts[parts.index("partner") + 1]
+        year = parts[parts.index("year") + 1]
+        dtype = parts[parts.index("datatype") + 1]
+    except (ValueError, IndexError) as exc:
+        raise ValueError(f"Cannot derive cache path from URL: {url}") from exc
+    return root / f"trn_r{rep}_p{partner}_y{year}_{dtype}.xml"
+
+
+def parse_trn_xml(xml_text: str | bytes) -> pd.DataFrame:
+    """Parse StructureSpecific TRN XML into one row per HS6 product series."""
+    if isinstance(xml_text, bytes):
+        xml_text = xml_text.decode("utf-8", errors="replace")
+    if not xml_text.strip():
+        return pd.DataFrame(
+            columns=[
+                "product_code",
+                "reporter",
+                "partner",
+                "year",
+                "ahs",
+                "nbr_na_lines",
+                "datatype",
+                "tariff_type",
+            ]
         )
-    frames: list[pd.DataFrame] = []
-    skipped: list[str] = []
-    for path in files:
-        normalized = _try_normalize_wits_csv(path)
-        if normalized is None:
-            skipped.append(path.name)
-            continue
-        frames.append(normalized)
-    if not frames:
-        raise FileNotFoundError(
-            "No schema-compatible WITS CSVs found "
-            f"(skipped non-conforming: {skipped}). "
-            "Expected columns: reporter_iso3,partner_iso3,year,hs_chapter,ahs_simple_avg. "
-            f"See {manual_dir() / 'wits' / 'README.md'}."
-        )
-    if skipped:
-        print(f"WITS: skipped non-conforming CSV(s): {skipped}")
-    return pd.concat(frames, ignore_index=True)
-
-
-def _parse_sdmx_obs_values(xml_text: str) -> list[dict[str, Any]]:
-    """Parse WITS SDMX-ML GenericData observations into dict rows."""
-    # Namespaces vary; match by localname.
     root = ET.fromstring(xml_text)
     rows: list[dict[str, Any]] = []
-
-    def local(tag: str) -> str:
-        return tag.rsplit("}", 1)[-1]
-
-    for obs in root.iter():
-        if local(obs.tag) != "Obs":
+    for el in root.iter():
+        if _local(el.tag) != "Series":
             continue
-        dims: dict[str, str] = {}
-        value = None
-        for child in list(obs):
-            lname = local(child.tag)
-            if lname == "ObsKey":
-                for value_el in child:
-                    if local(value_el.tag) == "Value":
-                        dims[value_el.attrib.get("id", "")] = value_el.attrib.get(
-                            "value", ""
-                        )
-            elif lname == "ObsValue":
-                value = child.attrib.get("value")
-            elif lname == "Value" and "id" in child.attrib:
-                dims[child.attrib["id"]] = child.attrib.get("value", "")
-        if value is None:
+        sattrs = {_local(k): v for k, v in el.attrib.items()}
+        product = str(sattrs.get("PRODUCTCODE", "")).strip()
+        if not product:
             continue
-        try:
-            num = float(value)
-        except ValueError:
-            continue
-        rows.append({"dims": dims, "value": num})
-    return rows
-
-
-def try_wits_api_probe(settings: Settings, session: requests.Session | None = None) -> pd.DataFrame:
-    """Probe the WITS SDMX API for origin partners (product from settings).
-
-    Chapter-level HS keys are not reliably exposed; this probe uses the configured
-    product (default Total) for each origin against a small reporter set to verify
-    connectivity. Full HS-chapter series must come from manual CSVs.
-    """
-    sess = session or requests.Session()
-    if session is None:
-        sess.trust_env = False  # avoid stuck proxy autodetection
-    reporters = ["USA", "DEU", "CHN"]
-    rows: list[dict[str, Any]] = []
-    base = settings.wits.base_url.rstrip("/")
-    indicator = settings.wits.indicator
-    product = settings.wits.product
-    for partner in settings.origins:
-        for reporter in reporters:
-            key = f"A.{reporter}.{partner}.{product}.{indicator}"
-            url = (
-                f"{base}/{key}"
-                f"?startPeriod={settings.years.start}&endPeriod={settings.years.end}"
-            )
+        reporter = str(sattrs.get("REPORTER", "")).strip()
+        partner = str(sattrs.get("PARTNER", "")).strip()
+        datatype = str(sattrs.get("DATATYPE", "")).strip()
+        for obs in list(el):
+            if _local(obs.tag) != "Obs":
+                continue
+            oattrs = {_local(k): v for k, v in obs.attrib.items()}
+            year_raw = oattrs.get("TIME_PERIOD")
+            val_raw = oattrs.get("OBS_VALUE")
+            if year_raw is None or val_raw is None:
+                continue
             try:
-                resp = sess.get(url, timeout=30)
-            except requests.RequestException:
+                year = int(str(year_raw)[:4])
+                ahs = float(val_raw)
+            except (TypeError, ValueError):
                 continue
-            if resp.status_code != 200:
-                continue
-            if "Invalid" in resp.text or "error" in resp.text.lower()[:200]:
-                continue
-            for obs in _parse_sdmx_obs_values(resp.text):
-                year = obs["dims"].get("TIME_PERIOD") or obs["dims"].get("TIME")
-                if year is None:
-                    continue
-                if not re.fullmatch(r"\d{4}", str(year)):
-                    continue
-                rows.append(
-                    {
-                        "reporter_iso3": reporter,
-                        "partner_iso3": partner,
-                        "year": int(year),
-                        "hs_chapter": "ALL",
-                        "ahs_simple_avg": obs["value"],
-                        "product_code": product,
-                        "source": "wits_api_probe",
-                    }
-                )
-    if not rows:
-        raise RuntimeError(
-            "WITS API probe returned no observations; use manual CSV exports "
-            f"in {manual_dir() / 'wits'}/"
-        )
+            try:
+                nbr_na = int(float(oattrs.get("NBR_NA_LINES") or 0))
+            except (TypeError, ValueError):
+                nbr_na = 0
+            rows.append(
+                {
+                    "product_code": product,
+                    "reporter": reporter,
+                    "partner": partner,
+                    "year": year,
+                    "ahs": ahs,
+                    "nbr_na_lines": nbr_na,
+                    "datatype": datatype,
+                    "tariff_type": oattrs.get("TARIFFTYPE", ""),
+                }
+            )
     return pd.DataFrame.from_records(rows)
 
 
+def filter_chapters(lines: pd.DataFrame, chapters: Iterable[str]) -> pd.DataFrame:
+    """Keep HS6 rows whose product code starts with a configured chapter."""
+    if lines.empty:
+        return lines.copy()
+    prefixes = {str(c).zfill(2) for c in chapters}
+    out = lines.copy()
+    out["hs_chapter"] = out["product_code"].astype(str).str[:2]
+    return out.loc[out["hs_chapter"].isin(prefixes)].copy()
+
+
+def merge_reported_aveestimated(
+    reported: pd.DataFrame,
+    aveestimated: pd.DataFrame,
+) -> pd.DataFrame:
+    """Prefer aveestimated AHS when reported lines have non-ad-valorem rates."""
+    if reported.empty and aveestimated.empty:
+        return reported.copy()
+    if aveestimated.empty:
+        return reported.copy()
+    if reported.empty:
+        return aveestimated.copy()
+
+    key = ["product_code", "reporter", "partner", "year"]
+    ave = aveestimated.drop_duplicates(key, keep="first").set_index(key)["ahs"]
+    rows: list[dict[str, Any]] = []
+    for _, row in reported.iterrows():
+        rec = row.to_dict()
+        k = tuple(row[c] for c in key)
+        if int(row.get("nbr_na_lines") or 0) > 0 and k in ave.index:
+            rec["ahs"] = float(ave.loc[k])
+            rec["datatype"] = "AveEstimated"
+            rec["ahs_source"] = "aveestimated"
+        else:
+            rec["ahs_source"] = "reported"
+        rows.append(rec)
+    return pd.DataFrame.from_records(rows)
+
+
+def aggregate_chapter_ahs(lines: pd.DataFrame) -> pd.DataFrame:
+    """Simple average of HS6 AHS rates by reporter/partner/chapter/year."""
+    if lines.empty:
+        return pd.DataFrame(
+            columns=[
+                "reporter",
+                "partner",
+                "year",
+                "hs_chapter",
+                "ahs_simple_avg",
+                "n_hs6",
+                "n_na_products",
+            ]
+        )
+    df = lines.copy()
+    if "hs_chapter" not in df.columns:
+        df["hs_chapter"] = df["product_code"].astype(str).str[:2]
+    g = (
+        df.groupby(["reporter", "partner", "year", "hs_chapter"], as_index=False)
+        .agg(
+            ahs_simple_avg=("ahs", "mean"),
+            n_hs6=("product_code", "nunique"),
+            n_na_products=(
+                "nbr_na_lines",
+                lambda s: int((pd.to_numeric(s, errors="coerce").fillna(0) > 0).sum()),
+            ),
+        )
+    )
+    return g
+
+
+def apply_locf(
+    panel: pd.DataFrame,
+    *,
+    value_col: str = "ahs_simple_avg",
+    flag_col: str = "tarif_locf",
+    enabled: bool = True,
+) -> pd.DataFrame:
+    """Last-observation-carried-forward by (dest, origin, chapter); flag fills.
+
+    ``panel`` must contain columns ``reporter_iso3``, ``partner_iso3``,
+    ``hs_chapter``, ``year``, and ``value_col``.
+    """
+    if panel.empty:
+        out = panel.copy()
+        out[flag_col] = pd.Series(dtype=bool)
+        return out
+    out = panel.sort_values(
+        ["reporter_iso3", "partner_iso3", "hs_chapter", "year"]
+    ).copy()
+    out[flag_col] = False
+    if not enabled:
+        return out
+    keys = ["reporter_iso3", "partner_iso3", "hs_chapter"]
+    filled_parts: list[pd.DataFrame] = []
+    for _, g in out.groupby(keys, sort=False):
+        gg = g.copy()
+        before = gg[value_col].isna()
+        gg[value_col] = gg[value_col].ffill()
+        gg[flag_col] = before & gg[value_col].notna()
+        filled_parts.append(gg)
+    return pd.concat(filled_parts, ignore_index=True)
+
+
+def _get_with_retries(
+    session: requests.Session,
+    url: str,
+    *,
+    retries: int = 5,
+    backoff: float = 1.5,
+    timeout: int = 90,
+) -> tuple[int, bytes]:
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        try:
+            resp = session.get(url, timeout=timeout)
+            if resp.status_code in (200, 404):
+                return resp.status_code, resp.content
+            if resp.status_code in (429, 500, 502, 503, 504):
+                time.sleep(backoff * (2**attempt))
+                continue
+            return resp.status_code, resp.content
+        except requests.RequestException as exc:
+            last_exc = exc
+            time.sleep(backoff * (2**attempt))
+    if last_exc is not None:
+        raise RuntimeError(f"WITS request failed after retries: {url}") from last_exc
+    raise RuntimeError(f"WITS request failed after retries: {url}")
+
+
+def fetch_cached_xml(
+    url: str,
+    *,
+    session: requests.Session,
+    force: bool = False,
+    retries: int = 5,
+    backoff: float = 1.5,
+) -> tuple[Path, int, bool]:
+    """Fetch URL into the raw WITS cache. Returns (path, http_status, from_cache)."""
+    path = cache_path_for_url(url)
+    if path.is_file() and path.stat().st_size > 0 and not force:
+        return path, 200, True
+    status, content = _get_with_retries(
+        session, url, retries=retries, backoff=backoff
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return path, status, False
+
+
+def destinations_from_baci(settings: Settings) -> list[str]:
+    """Union of top-N destinations across origins (same rule as the panel)."""
+    from imsfe.build.panel import (
+        destination_import_totals,
+        load_baci_chapter_flows,
+        select_destinations_for_origin,
+    )
+
+    chapter = str(settings.hs_chapters.primary).zfill(2)
+    flows = load_baci_chapter_flows(settings, chapter=chapter)
+    totals = destination_import_totals(flows, settings.years.end)
+    dests: set[str] = set()
+    for origin in settings.origins:
+        dests.update(
+            select_destinations_for_origin(totals, origin, settings.n_destinations)
+        )
+    return sorted(dests)
+
+
 def fetch_wits(settings: Settings | None = None, *, force: bool = False) -> dict[str, Any]:
-    """Prefer manual HS-chapter CSVs; fall back to a limited WITS API probe."""
+    """Download TRN tariffs, aggregate to chapter AHS, optional LOCF, write parquet."""
     settings = settings or load_settings()
     version = settings.wits.version
     rel = WITS_PARQUET_REL
     if should_skip("wits", version, [rel], force=force):
         return {"skipped": True, "parquet": str(raw_dir() / rel)}
 
-    source_note = ""
-    try:
-        df = load_manual_wits_csvs()
-        source_note = "manual:data/manual/wits"
-    except FileNotFoundError:
+    base_url = (settings.wits.base_url or TRN_DEFAULT_BASE).rstrip("/")
+    # Prefer TRN datasource path even if legacy TradeStats URL remains in old configs.
+    if "datasource/TRN" not in base_url:
+        base_url = TRN_DEFAULT_BASE
+
+    locf = bool(getattr(settings.wits, "locf", True))
+    max_workers = int(getattr(settings.wits, "max_workers", 8))
+    retries = int(getattr(settings.wits, "retries", 5))
+    backoff = float(getattr(settings.wits, "backoff_sec", 1.5))
+    years = list(range(settings.years.start, settings.years.end + 1))
+    chapters = settings.hs_chapter_codes()
+
+    destinations = destinations_from_baci(settings)
+    # Unique WITS reporters (EU collapsed to 918). Skip BACI residual codes
+    # without ISO numeric identifiers (e.g. S19 "Other Asia, nes").
+    seen_rep: set[str] = set()
+    skipped_dests: list[str] = []
+    eu_dests = [d for d in destinations if d in EU27_ISO3]
+    non_eu = [d for d in destinations if d not in EU27_ISO3]
+    resolved_non_eu: list[str] = []
+    for d in non_eu:
         try:
-            df = try_wits_api_probe(settings)
-            source_note = settings.wits.base_url
-            # API probe is not chapter-complete — do not pretend it is.
-            print(
-                "WITS: no manual CSVs found; stored API probe rows with hs_chapter=ALL. "
-                "For HS-chapter AHS averages required by SPEC, export CSVs into "
-                "data/manual/wits/ (see README)."
+            seen_rep.add(wits_reporter_code(d))
+            resolved_non_eu.append(d)
+        except KeyError:
+            skipped_dests.append(d)
+    non_eu = resolved_non_eu
+    if eu_dests:
+        seen_rep.add("918")
+    if skipped_dests:
+        print(
+            f"WITS: skipping destinations without ISO numeric codes: {skipped_dests}",
+            flush=True,
+        )
+
+    partners = [(o, wits_partner_code(o)) for o in settings.origins]
+
+    session = requests.Session()
+    session.trust_env = False
+    session.headers.update({"User-Agent": "imsfe-wits/2.0 (research; mailto:research@example.com)"})
+
+    # Build fetch list: unique (reporter_code, partner_code, year) × reported
+    # (+ aveestimated only when needed after parse — second pass)
+    fetch_keys: list[tuple[str, str, int, str]] = []
+    unique_reporters = sorted(seen_rep)
+    for rep in unique_reporters:
+        for _origin, partner in partners:
+            for year in years:
+                fetch_keys.append((rep, partner, year, "reported"))
+
+    def _one(key: tuple[str, str, int, str]) -> dict[str, Any]:
+        rep, partner, year, dtype = key
+        url = trn_url(rep, partner, year, dtype, base_url=base_url)
+        path, status, cached = fetch_cached_xml(
+            url, session=session, force=force, retries=retries, backoff=backoff
+        )
+        return {
+            "reporter": rep,
+            "partner": partner,
+            "year": year,
+            "datatype": dtype,
+            "path": str(path),
+            "status": status,
+            "cached": cached,
+            "url": url,
+        }
+
+    meta_rows: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futs = {pool.submit(_one, k): k for k in fetch_keys}
+        for fut in as_completed(futs):
+            meta_rows.append(fut.result())
+
+    # Parse reported, decide which need aveestimated
+    line_frames: list[pd.DataFrame] = []
+    need_ave: list[tuple[str, str, int]] = []
+    for meta in meta_rows:
+        if meta["status"] != 200:
+            continue
+        path = Path(meta["path"])
+        if path.stat().st_size < 50:
+            continue
+        lines = parse_trn_xml(path.read_bytes())
+        lines = filter_chapters(lines, chapters)
+        if lines.empty:
+            continue
+        line_frames.append(lines)
+        if (lines["nbr_na_lines"].fillna(0) > 0).any():
+            need_ave.append((meta["reporter"], meta["partner"], meta["year"]))
+
+    # Second pass: aveestimated for triples with NA lines
+    need_ave = sorted(set(need_ave))
+    ave_frames: list[pd.DataFrame] = []
+    if need_ave:
+        ave_keys = [(r, p, y, "aveestimated") for r, p, y in need_ave]
+
+        def _ave(key: tuple[str, str, int, str]) -> dict[str, Any]:
+            return _one(key)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for fut in as_completed({pool.submit(_ave, k): k for k in ave_keys}):
+                meta = fut.result()
+                meta_rows.append(meta)
+                if meta["status"] != 200:
+                    continue
+                path = Path(meta["path"])
+                if path.stat().st_size < 50:
+                    continue
+                lines = filter_chapters(parse_trn_xml(path.read_bytes()), chapters)
+                if not lines.empty:
+                    ave_frames.append(lines)
+
+    reported_all = (
+        pd.concat(line_frames, ignore_index=True) if line_frames else pd.DataFrame()
+    )
+    ave_all = pd.concat(ave_frames, ignore_index=True) if ave_frames else pd.DataFrame()
+    merged = merge_reported_aveestimated(reported_all, ave_all)
+    agg = aggregate_chapter_ahs(merged)
+
+    # Map reporter/partner numeric → ISO3 destinations
+    partner_inv = {wits_partner_code(o): o for o in settings.origins}
+    # Expand EU reporter onto each EU destination present in the destination set
+    rows_out: list[dict[str, Any]] = []
+    for _, row in agg.iterrows():
+        partner_iso = partner_inv.get(str(row["partner"]).zfill(3)) or partner_inv.get(
+            str(int(row["partner"]))
+        )
+        if partner_iso is None:
+            # try without zfill variants
+            for code, iso in partner_inv.items():
+                if str(int(code)) == str(int(row["partner"])):
+                    partner_iso = iso
+                    break
+        if partner_iso is None:
+            continue
+        rep = str(row["reporter"]).zfill(3)
+        if rep == "918" or str(int(rep)) == "918":
+            dest_list = [d for d in destinations if d in EU27_ISO3]
+        else:
+            # reverse numeric → iso3 among non-EU destinations
+            dest_list = []
+            for d in non_eu:
+                try:
+                    if wits_reporter_code(d) == rep or int(wits_reporter_code(d)) == int(rep):
+                        dest_list.append(d)
+                except KeyError:
+                    continue
+        for dest in dest_list:
+            rows_out.append(
+                {
+                    "reporter_iso3": dest,
+                    "partner_iso3": partner_iso,
+                    "year": int(row["year"]),
+                    "hs_chapter": str(row["hs_chapter"]).zfill(2),
+                    "ahs_simple_avg": float(row["ahs_simple_avg"]),
+                    "n_hs6": int(row["n_hs6"]),
+                    "n_na_products": int(row.get("n_na_products", 0)),
+                }
             )
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(
-                "WITS unavailable via API and no manual CSVs present. "
-                f"Place exports in data/manual/wits/. Detail: {exc}"
-            ) from exc
+
+    df = pd.DataFrame.from_records(rows_out)
+    # Complete year grid for LOCF
+    if not df.empty:
+        grid_keys = (
+            df[["reporter_iso3", "partner_iso3", "hs_chapter"]]
+            .drop_duplicates()
+            .assign(_k=1)
+            .merge(pd.DataFrame({"year": years, "_k": 1}), on="_k")
+            .drop(columns="_k")
+        )
+        df = grid_keys.merge(
+            df,
+            on=["reporter_iso3", "partner_iso3", "hs_chapter", "year"],
+            how="left",
+        )
+        df = apply_locf(df, enabled=locf)
+    else:
+        df = pd.DataFrame(
+            columns=[
+                "reporter_iso3",
+                "partner_iso3",
+                "year",
+                "hs_chapter",
+                "ahs_simple_avg",
+                "n_hs6",
+                "n_na_products",
+                "tarif_locf",
+            ]
+        )
 
     path = raw_dir() / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path, index=False)
+
+    n_locf = int(df["tarif_locf"].sum()) if "tarif_locf" in df.columns else 0
+    n_cached = sum(1 for m in meta_rows if m.get("cached"))
     record_artifact(
         "wits",
-        url=source_note,
+        url=base_url,
         version=version,
         relative_paths=[rel],
         sha256=sha256_file(path),
-        extra={"n_rows": int(len(df)), "columns": list(df.columns)},
+        extra={
+            "n_rows": int(len(df)),
+            "n_locf": n_locf,
+            "n_api_calls": len(meta_rows),
+            "n_cached": n_cached,
+            "n_destinations": len(destinations),
+            "chapters": chapters,
+            "columns": list(df.columns),
+        },
     )
-    return {"skipped": False, "parquet": str(path), "url": source_note, "n_rows": len(df)}
+    return {
+        "skipped": False,
+        "parquet": str(path),
+        "url": base_url,
+        "n_rows": len(df),
+        "n_locf": n_locf,
+        "n_api_calls": len(meta_rows),
+        "n_cached": n_cached,
+    }

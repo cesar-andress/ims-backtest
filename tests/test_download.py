@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -162,16 +163,37 @@ def test_gravity_convert_keeps_columns(isolated_raw: Path) -> None:
     assert set(df["year"]) == {2020}
 
 
-def test_wits_manual_loader(isolated_raw: Path) -> None:
-    path = isolated_raw / "data" / "manual" / "wits" / "sample.csv"
-    path.write_text(
-        "reporter_iso3,partner_iso3,year,hs_chapter,ahs_simple_avg\n"
-        "USA,COL,2020,64,0.0\n",
-        encoding="utf-8",
+def test_wits_parse_trn_fixture_no_network() -> None:
+    fixture = (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / "wits"
+        / "trn_840_170_2019_reported_hs64_09.xml"
     )
-    df = wits_mod.load_manual_wits_csvs([path])
-    assert len(df) == 1
-    assert df.iloc[0]["ahs_simple_avg"] == 0.0
+    assert fixture.is_file()
+    lines = wits_mod.parse_trn_xml(fixture.read_bytes())
+    assert not lines.empty
+    assert set(lines["product_code"].str[:2]).issubset({"64", "09"})
+    filt = wits_mod.filter_chapters(lines, ["64"])
+    assert (filt["hs_chapter"] == "64").all()
+    agg = wits_mod.aggregate_chapter_ahs(filt)
+    assert len(agg) >= 1
+    assert "ahs_simple_avg" in agg.columns
+
+
+def test_wits_locf_flags_filled_years() -> None:
+    panel = pd.DataFrame(
+        {
+            "reporter_iso3": ["USA", "USA", "USA"],
+            "partner_iso3": ["COL", "COL", "COL"],
+            "hs_chapter": ["64", "64", "64"],
+            "year": [2018, 2019, 2020],
+            "ahs_simple_avg": [5.0, np.nan, np.nan],
+        }
+    )
+    out = wits_mod.apply_locf(panel, enabled=True)
+    assert list(out["ahs_simple_avg"]) == [5.0, 5.0, 5.0]
+    assert list(out["tarif_locf"]) == [False, True, True]
 
 
 def test_hofstede_manual_loader(isolated_raw: Path) -> None:

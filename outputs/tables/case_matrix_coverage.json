@@ -2,7 +2,7 @@
   "origin": "COL",
   "year": 2023,
   "hs_chapter": "64",
-  "n_destinations": 55,
+  "n_destinations": 31,
   "attr_used": [
     "IMPV",
     "IMPC",
@@ -17,38 +17,37 @@
   ],
   "fit_used": [
     "UVGAP",
+    "CULT",
     "LANG",
     "DIST",
+    "TARIF",
     "FTA"
   ],
-  "fit_dropped": [
-    "CULT",
-    "TARIF"
-  ],
-  "attr_cut_median": 5.76262451180148,
-  "fit_cut_median": 4.616338716866438,
+  "fit_dropped": [],
+  "attr_cut_median": 6.5983599512449675,
+  "fit_cut_median": 6.268671544951969,
   "locf_fit": {
     "DIST": {
-      "n_filled": 55,
+      "n_filled": 59,
       "n_missing_before": 60,
       "source_year_min": 2021,
       "source_year_max": 2021
     },
     "LANG": {
-      "n_filled": 55,
+      "n_filled": 59,
       "n_missing_before": 60,
       "source_year_min": 2021,
       "source_year_max": 2021
     },
     "FTA": {
-      "n_filled": 55,
+      "n_filled": 59,
       "n_missing_before": 60,
       "source_year_min": 2021,
       "source_year_max": 2021
     },
     "CULT": {
       "n_filled": 0,
-      "n_missing_before": 60,
+      "n_missing_before": 5,
       "source_year_min": null,
       "source_year_max": null
     }

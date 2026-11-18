@@ -1,0 +1,22 @@
+# Explicit map: IMSFE 2.0 criterion -> legacy Excel expert variable(s), or "unmapped".
+# Used for T2 reporting and SMAA dispersion for unmapped criteria
+# (empirical SD of mapped experts within the same factor — not a fixed CV).
+criteria:
+  IMPV: unmapped
+  IMPC: unmapped
+  GRW: unmapped
+  GDPPC: unmapped
+  DIST: [INTC]
+  TARIF: [CIBC]
+  FTA: [PPAD]
+  LPI: [LPIN]
+  ASIASH: [CUTA]
+  HHI: [CCTI]
+  UVGAP: unmapped
+  CULT: [CUDI]
+  LANG: [GLIN]
+  INFL: [INAN]
+  UNEMP: [UNRA]
+  GOV: [FSIN, INRI, DEIN]
+  EOC: [CLI]
+  REEXP: unmapped

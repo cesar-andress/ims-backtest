@@ -55,18 +55,47 @@ def _load_gravity(path: Path | None = None) -> pd.DataFrame:
                 "fta_wto",
             ]
         )
-    return pd.read_parquet(p)
+    g = pd.read_parquet(p)
+    # Defensive: CEPII Gravity can contain duplicate (o,d,year) shells.
+    if not g.empty and g.duplicated(["iso3_o", "iso3_d", "year"]).any():
+        score_cols = [
+            c
+            for c in ("distw_harmonic", "distw", "contig", "comlang_off", "fta_wto")
+            if c in g.columns
+        ]
+        if score_cols:
+            g = g.assign(_nnz=g[score_cols].notna().sum(axis=1))
+            g = g.sort_values(
+                ["iso3_o", "iso3_d", "year", "_nnz"],
+                ascending=[True, True, True, False],
+            )
+            g = g.drop_duplicates(["iso3_o", "iso3_d", "year"], keep="first")
+            g = g.drop(columns=["_nnz"])
+        else:
+            g = g.drop_duplicates(["iso3_o", "iso3_d", "year"], keep="first")
+    return g
 
 
 def _load_hofstede(path: Path | None = None) -> pd.DataFrame:
-    """Load Hofstede raw parquet or manual CSV; empty frame if absent."""
+    """Load Hofstede raw parquet or manual CSV.
+
+    Raises
+    ------
+    FileNotFoundError
+        If neither the processed parquet nor a manual CSV is present.
+        CULT must not be silently left as NaN when the source is missing.
+    """
     raw_p = path or (raw_dir() / "hofstede" / "hofstede.parquet")
     if raw_p.is_file():
         return pd.read_parquet(raw_p)
     manual = raw_dir().parent / "manual" / "hofstede"
     csvs = sorted(manual.glob("*.csv")) if manual.is_dir() else []
     if not csvs:
-        return pd.DataFrame(columns=["iso3", *HOFSTEDE_DIMS])
+        raise FileNotFoundError(
+            "Hofstede scores required for CULT (Kogut-Singh) are absent. "
+            f"Place a 6-dimension CSV in {manual}/ "
+            "(see data/manual/hofstede/README.md) and re-run download/build."
+        )
     from imsfe.download.hofstede import load_hofstede_csv
 
     return load_hofstede_csv(csvs[0])

@@ -16,6 +16,7 @@ from imsfe.validation.backtest import (
     ABLATION_SETS,
     bootstrap_ablation_deltas,
     bootstrap_method_summary,
+    bootstrap_paired_deltas,
     collect_method_metrics,
     factor_scores_slice,
     make_split,
@@ -62,97 +63,161 @@ def default_method_specs() -> list[dict[str, str]]:
     return specs
 
 
+def assert_panel_unique(panel: pd.DataFrame) -> None:
+    """Require unique (origin, dest, year, chapter) keys."""
+    keys = ["iso3_o", "iso3_d", "year"]
+    if "hs_chapter" in panel.columns:
+        keys = ["iso3_o", "iso3_d", "year", "hs_chapter"]
+    dup = int(panel.duplicated(keys).sum())
+    if dup:
+        raise AssertionError(
+            f"panel has {dup} duplicate rows on {keys}; expected unique keys"
+        )
+
+
 def run_validation(
     *,
     first_test_year: int = 2019,
     horizon: int = 1,
     n_boot: int | None = None,
-    n_learned_restarts: int = 3,
+    n_learned_restarts: int = 5,
     panel_path: Path | None = None,
+    horizons: list[int] | None = None,
+    targets: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Full predictive-validation pipeline."""
+    """Full predictive-validation pipeline (multiple horizons × targets)."""
     settings = load_settings()
     n_boot = int(settings.bootstrap.n_reps if n_boot is None else n_boot)
     path = panel_path or (processed_dir() / "panel_ijt.parquet")
     panel = pd.read_parquet(path)
-    # Guard against accidental duplicate i×j×t rows from older builds.
+    assert_panel_unique(panel)
     panel = panel.drop_duplicates(["iso3_o", "iso3_d", "year"], keep="first")
-    split = make_split(
+
+    hs = list(horizons if horizons is not None else settings.horizons)
+    if horizon not in hs:
+        hs = sorted(set(hs) | {int(horizon)})
+    tgts = list(targets if targets is not None else ["intensive", "new_markets", "growth"])
+
+    # Learned weights + gravity on primary horizon (first in list / CLI horizon)
+    primary_h = int(horizon)
+    split0 = make_split(
         panel["year"].unique(),
         first_test_year=first_test_year,
-        horizon=horizon,
+        horizon=primary_h,
     )
     print(
-        f"split: train_features={split.train_feature_years} "
-        f"test_features={split.test_feature_years} k={horizon}",
+        f"split(k={primary_h}): train_features={split0.train_feature_years} "
+        f"test_features={split0.test_feature_years}",
         flush=True,
     )
-    split.assert_no_leakage()
+    split0.assert_no_leakage()
 
-    # --- learned weights on training years only ---
     print("fitting learned weights...", flush=True)
     learned, learned_info = fit_learned_weights(
         panel,
-        split.train_feature_years,
-        horizon=horizon,
+        split0.train_feature_years,
+        horizon=primary_h,
         n_restarts=n_learned_restarts,
         seed=settings.seed,
         maxiter=40,
+        force_cpu=True,
     )
     learned_path = outputs_tables_dir() / "T4_learned_vs_expert_weights.csv"
     learned_info["comparison"].to_csv(learned_path, index=False)
+    if learned_info.get("absent_variables"):
+        pd.DataFrame({"absent_variable": learned_info["absent_variables"]}).to_csv(
+            outputs_tables_dir() / "T4_learned_absent_variables.csv", index=False
+        )
 
-    # --- gravity predictive baseline ---
     print("fitting gravity PPML...", flush=True)
-    grav_est = fit_gravity_ppml(panel, split.train_feature_years, destination_fe=False)
-    grav_scores = predict_gravity_scores(panel, grav_est, split.test_feature_years)
+    grav_est = fit_gravity_ppml(panel, split0.train_feature_years, destination_fe=False)
 
-    # --- block metrics ---
-    print("collecting walk-forward metrics...", flush=True)
-    blocks = collect_method_metrics(
-        panel,
-        split,
-        method_specs=default_method_specs(),
-        gravity_score_table=grav_scores,
-        learned_weights=learned,
-        random_seeds=100,
-    )
+    all_blocks: list[pd.DataFrame] = []
+    t4_parts: list[pd.DataFrame] = []
+    paired_parts: list[pd.DataFrame] = []
+    t6 = pd.DataFrame()
+    abl_means = pd.DataFrame()
+    primary_ablation = pd.DataFrame()
+
+    for h in hs:
+        split = make_split(
+            panel["year"].unique(), first_test_year=first_test_year, horizon=int(h)
+        )
+        split.assert_no_leakage()
+        grav_scores = predict_gravity_scores(panel, grav_est, split.test_feature_years)
+        for target in tgts:
+            print(
+                f"collecting walk-forward metrics (k={h}, target={target})...",
+                flush=True,
+            )
+            block_h = collect_method_metrics(
+                panel,
+                split,
+                method_specs=default_method_specs(),
+                gravity_score_table=grav_scores,
+                learned_weights=learned,
+                random_seeds=100,
+                target=target,
+            )
+            all_blocks.append(block_h)
+            sub = block_h.loc[block_h["family"] != "ablation"]
+            for metric in ("ndcg@10", "spearman", "precision@10", "auc"):
+                if metric not in sub.columns:
+                    continue
+                summary = bootstrap_method_summary(
+                    sub, metric=metric, n_reps=n_boot, seed=settings.bootstrap.seed
+                )
+                summary["target"] = target
+                summary["horizon"] = int(h)
+                t4_parts.append(summary)
+            paired = bootstrap_paired_deltas(
+                sub,
+                metric="ndcg@10",
+                n_reps=n_boot,
+                seed=settings.bootstrap.seed,
+            )
+            paired_parts.append(paired)
+            if h == primary_h and target == "intensive":
+                primary_ablation = block_h.loc[
+                    block_h["method"].isin(ABLATION_SETS.keys())
+                ]
+
+    if not primary_ablation.empty:
+        t6 = bootstrap_ablation_deltas(
+            primary_ablation,
+            metric="ndcg@10",
+            baseline="base_macro",
+            n_reps=n_boot,
+            seed=settings.bootstrap.seed,
+        )
+        abl_means = bootstrap_method_summary(
+            primary_ablation,
+            metric="ndcg@10",
+            n_reps=n_boot,
+            seed=settings.bootstrap.seed,
+        )
+
+    blocks = pd.concat(all_blocks, ignore_index=True)
     blocks_path = processed_dir() / "validation_blocks.parquet"
     blocks.to_parquet(blocks_path, index=False)
 
-    # T4: summary with CI for key metrics
-    t4_parts = []
-    for metric in ("ndcg@10", "spearman", "precision@10", "auc"):
-        if metric not in blocks.columns:
-            continue
-        # Exclude ablation from T4 main table
-        sub = blocks.loc[blocks["family"] != "ablation"]
-        t4_parts.append(
-            bootstrap_method_summary(
-                sub, metric=metric, n_reps=n_boot, seed=settings.bootstrap.seed
-            )
-        )
-    t4 = pd.concat(t4_parts, ignore_index=True)
+    t4 = pd.concat(t4_parts, ignore_index=True) if t4_parts else pd.DataFrame()
     t4_path = outputs_tables_dir() / "T4_predictive_metrics.csv"
     t4.to_csv(t4_path, index=False)
 
-    # T6: ablation deltas
-    abl_blocks = blocks.loc[blocks["method"].isin(ABLATION_SETS.keys())]
-    t6 = bootstrap_ablation_deltas(
-        abl_blocks,
-        metric="ndcg@10",
-        baseline="base_macro",
-        n_reps=n_boot,
-        seed=settings.bootstrap.seed,
-    )
-    # also raw means
-    abl_means = bootstrap_method_summary(
-        abl_blocks, metric="ndcg@10", n_reps=n_boot, seed=settings.bootstrap.seed
-    )
+    paired = pd.concat(paired_parts, ignore_index=True) if paired_parts else pd.DataFrame()
+    paired_path = outputs_tables_dir() / "T4_paired_lift.csv"
+    paired.to_csv(paired_path, index=False)
+
     t6_path = outputs_tables_dir() / "T6_ablation.csv"
-    t6_out = t6.copy()
-    t6_out.to_csv(t6_path, index=False)
+    t6.to_csv(t6_path, index=False)
     abl_means.to_csv(outputs_tables_dir() / "T6_ablation_levels.csv", index=False)
+
+    # Primary blocks for T5 / F4 (intensive, primary horizon)
+    primary_blocks = blocks.loc[
+        (blocks["target"] == "intensive") & (blocks["horizon"] == primary_h)
+    ]
+    split = split0
 
     # T5: explanatory PPML on IMS score + factor scores (test years)
     print("fitting explanatory PPML (T5)...", flush=True)
@@ -233,10 +298,10 @@ def run_validation(
     t5_path = outputs_tables_dir() / "T5_ppml.csv"
     t5.to_csv(t5_path, index=False)
 
-    # F4: NDCG@10 by year and method
-    f4_path = _plot_f4(blocks.loc[blocks["family"] != "ablation"])
+    # F4: NDCG@10 by year and method (intensive, primary horizon)
+    f4_path = _plot_f4(primary_blocks.loc[primary_blocks["family"] != "ablation"])
 
-    summary = _plain_summary(t4, t5, t6, learned_info)
+    summary = _plain_summary(t4, t5, t6, learned_info, paired=paired)
     summary_path = outputs_tables_dir() / "validation_summary.txt"
     summary_path.write_text(summary + "\n", encoding="utf-8")
 
@@ -244,6 +309,7 @@ def run_validation(
         "split": split,
         "t4": t4,
         "t4_path": t4_path,
+        "t4_paired_path": paired_path,
         "t5": t5,
         "t5_path": t5_path,
         "t6": t6,
@@ -298,16 +364,23 @@ def _plain_summary(
     t5: pd.DataFrame,
     t6: pd.DataFrame,
     learned_info: dict[str, Any],
+    *,
+    paired: pd.DataFrame | None = None,
 ) -> str:
     """One paragraph of factual numbers only (no manuscript claims)."""
 
-    def _row(method: str, metric: str) -> str:
-        sub = t4.loc[(t4["method"] == method) & (t4["metric"] == metric)]
+    def _row(method: str, metric: str, *, target: str = "intensive", horizon: int = 1) -> str:
+        mask = (t4["method"] == method) & (t4["metric"] == metric)
+        if "target" in t4.columns:
+            mask = mask & (t4["target"] == target)
+        if "horizon" in t4.columns:
+            mask = mask & (t4["horizon"] == horizon)
+        sub = t4.loc[mask]
         if sub.empty:
-            return f"{method}/{metric}=NA"
+            return f"{method}/{metric}/{target}/k{horizon}=NA"
         r = sub.iloc[0]
         return (
-            f"{method} {metric}={r['mean']:.3f} "
+            f"{method} {metric}[{target},k={horizon}]={r['mean']:.3f} "
             f"[{r['ci95_low']:.3f},{r['ci95_high']:.3f}]"
         )
 
@@ -319,6 +392,9 @@ def _plain_summary(
         _row("random", "ndcg@10"),
         _row("wsm|minmax|expert_mean", "auc"),
     ]
+    for target in ("new_markets", "growth"):
+        bits.append(_row("wsm|minmax|expert_mean", "ndcg@10", target=target, horizon=1))
+        bits.append(_row("random", "ndcg@10", target=target, horizon=1))
     abl = []
     for _, r in t6.iterrows():
         abl.append(
@@ -332,12 +408,29 @@ def _plain_summary(
             f"PPML ims_score coef={r['estimate']:.4f} se={r['std_error']:.4f} "
             f"n={int(r['n_obs'])}"
         )
+    paired_bits = []
+    if paired is not None and not paired.empty:
+        focus = paired.loc[
+            (paired["method"] == "wsm|minmax|expert_mean")
+            & (paired["target"] == "intensive")
+            & (paired["horizon"] == 1)
+        ]
+        for _, r in focus.iterrows():
+            paired_bits.append(
+                f"{r['contrast']} Δ={r['delta_mean']:.3f} "
+                f"[{r['ci95_low']:.3f},{r['ci95_high']:.3f}]"
+            )
+    absent = learned_info.get("absent_variables") or []
     return (
         "Walk-forward results (factual): "
         + "; ".join(bits)
+        + ". Paired lift: "
+        + ("; ".join(paired_bits) if paired_bits else "NA")
         + ". Ablation: "
         + ("; ".join(abl) if abl else "NA")
         + ". "
         + ("; ".join(t5_bits) if t5_bits else "T5 PPML terms recorded in T5_ppml.csv")
-        + f". Learned-weight train NDCG@10={learned_info.get('train_ndcg@10', float('nan')):.3f}."
+        + f". Learned-weight train NDCG@10={learned_info.get('train_ndcg@10', float('nan')):.3f}"
+        + (f"; absent_variables={absent}" if absent else "")
+        + "."
     )

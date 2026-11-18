@@ -226,17 +226,28 @@ def baseline_scores(
     raise ValueError(f"Unknown baseline {name}")
 
 
+TARGET_Y_COLUMNS = {
+    "intensive": "y_int_k{k}",
+    "growth": "y_growth_k{k}",
+    "new_markets": "y_newmarket_k{k}",
+}
+
+
 def metrics_for_scores(
     scores: pd.Series,
     group: pd.DataFrame,
     *,
     horizon: int,
+    target: str = "intensive",
 ) -> dict[str, float]:
     g = group.drop_duplicates("iso3_d", keep="first").set_index("iso3_d")
     scores = scores[~scores.index.duplicated(keep="first")]
-    y_int = g[f"y_int_k{horizon}"] if f"y_int_k{horizon}" in g.columns else None
+    y_tmpl = TARGET_Y_COLUMNS.get(target, TARGET_Y_COLUMNS["intensive"])
+    y_col = y_tmpl.format(k=horizon)
+    y_int = g[y_col] if y_col in g.columns else None
     y_ext = g[f"y_ext_k{horizon}"] if f"y_ext_k{horizon}" in g.columns else None
-    return evaluate_ranking(scores, y_int=y_int, y_ext=y_ext)
+    # For new_markets / growth, AUC on y_ext is still informative but secondary.
+    return evaluate_ranking(scores, y_int=y_int, y_ext=y_ext if target == "intensive" else None)
 
 
 def collect_method_metrics(
@@ -248,6 +259,7 @@ def collect_method_metrics(
     random_seeds: int = 100,
     gravity_score_table: pd.DataFrame | None = None,
     learned_weights: Weights | None = None,
+    target: str = "intensive",
 ) -> pd.DataFrame:
     """Evaluate methods/baselines on every test origin-year; one row per block."""
     settings = load_settings()
@@ -292,13 +304,17 @@ def collect_method_metrics(
             )
             if sc.empty:
                 continue
-            mets = metrics_for_scores(sc, group, horizon=split.horizon)
+            mets = metrics_for_scores(
+                sc, group, horizon=split.horizon, target=target
+            )
             rows.append(
                 {
                     "origin": origin,
                     "year": int(year),
                     "method": name,
                     "family": "ims",
+                    "target": target,
+                    "horizon": int(split.horizon),
                     **mets,
                 }
             )
@@ -326,7 +342,11 @@ def collect_method_metrics(
                 for s in range(random_seeds):
                     rng = np.random.default_rng(settings.seed + s)
                     sc_r = baseline_scores(group, "random", rng=rng)
-                    acc.append(metrics_for_scores(sc_r, group, horizon=split.horizon))
+                    acc.append(
+                        metrics_for_scores(
+                            sc_r, group, horizon=split.horizon, target=target
+                        )
+                    )
                 if not acc:
                     continue
                 avg = pd.DataFrame(acc).mean(numeric_only=True).to_dict()
@@ -336,6 +356,8 @@ def collect_method_metrics(
                         "year": int(year),
                         "method": "random",
                         "family": "baseline",
+                        "target": target,
+                        "horizon": int(split.horizon),
                         **avg,
                     }
                 )
@@ -344,13 +366,17 @@ def collect_method_metrics(
                 sc = baseline_scores(group, b)
             if sc is None or sc.empty:
                 continue
-            mets = metrics_for_scores(sc, group, horizon=split.horizon)
+            mets = metrics_for_scores(
+                sc, group, horizon=split.horizon, target=target
+            )
             rows.append(
                 {
                     "origin": origin,
                     "year": int(year),
                     "method": b,
                     "family": "baseline",
+                    "target": target,
+                    "horizon": int(split.horizon),
                     **mets,
                 }
             )
@@ -362,13 +388,17 @@ def collect_method_metrics(
             )
             if sc.empty:
                 continue
-            mets = metrics_for_scores(sc, group, horizon=split.horizon)
+            mets = metrics_for_scores(
+                sc, group, horizon=split.horizon, target=target
+            )
             rows.append(
                 {
                     "origin": origin,
                     "year": int(year),
                     "method": abl_name,
                     "family": "ablation",
+                    "target": target,
+                    "horizon": int(split.horizon),
                     **mets,
                 }
             )
@@ -412,6 +442,76 @@ def bootstrap_method_summary(
                 "n_blocks": int(np.isfinite(vals).sum()),
             }
         )
+    return pd.DataFrame.from_records(rows)
+
+
+def bootstrap_paired_deltas(
+    block_metrics: pd.DataFrame,
+    *,
+    methods: list[str] | None = None,
+    baselines: tuple[str, ...] = ("import_volume", "gravity_ppml", "random"),
+    metric: str = "ndcg@10",
+    n_reps: int = 2000,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Paired bootstrap Δ(method − baseline) with 95% CIs over origin-year blocks.
+
+    Also reports lift over random when ``random`` is among baselines.
+    """
+    rng = np.random.default_rng(seed)
+    present = set(block_metrics["method"])
+    if methods is None:
+        methods = sorted(
+            m
+            for m in present
+            if m not in baselines and not str(m).startswith("base_")
+            and m not in ABLATION_SETS
+        )
+    blocks = block_metrics[["origin", "year"]].drop_duplicates().reset_index(drop=True)
+    pivot = block_metrics.pivot_table(
+        index=["origin", "year"], columns="method", values=metric, aggfunc="first"
+    )
+    target = (
+        str(block_metrics["target"].iloc[0]) if "target" in block_metrics.columns else ""
+    )
+    horizon = (
+        int(block_metrics["horizon"].iloc[0])
+        if "horizon" in block_metrics.columns
+        else -1
+    )
+    rows: list[dict[str, Any]] = []
+    for method in methods:
+        if method not in pivot.columns:
+            continue
+        for baseline in baselines:
+            if baseline not in pivot.columns:
+                continue
+            aligned = blocks.merge(
+                (pivot[method] - pivot[baseline]).rename("delta").reset_index(),
+                on=["origin", "year"],
+                how="left",
+            )["delta"].to_numpy(dtype=float)
+            obs = float(np.nanmean(aligned))
+            n_blocks = len(aligned)
+            boots = np.empty(n_reps, dtype=float)
+            for r in range(n_reps):
+                idx = rng.integers(0, n_blocks, size=n_blocks)
+                boots[r] = float(np.nanmean(aligned[idx]))
+            lo, hi = np.nanpercentile(boots, [2.5, 97.5])
+            rows.append(
+                {
+                    "contrast": f"{method} - {baseline}",
+                    "method": method,
+                    "baseline": baseline,
+                    "metric": metric,
+                    "target": target,
+                    "horizon": horizon,
+                    "delta_mean": obs,
+                    "ci95_low": float(lo),
+                    "ci95_high": float(hi),
+                    "n_blocks": int(np.isfinite(aligned).sum()),
+                }
+            )
     return pd.DataFrame.from_records(rows)
 
 

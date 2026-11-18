@@ -82,12 +82,14 @@ class SourceRefSettings(BaseModel):
 
 
 class WitsSettings(BaseModel):
-    version: str = "trains-ahs"
-    base_url: str = (
-        "https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_TradeStats_Tariff"
-    )
+    version: str = "trn-ahs-v1"
+    base_url: str = "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN"
     indicator: str = "AHS-SMPL-AVRG"
-    product: str = "Total"
+    product: str = "all"
+    locf: bool = True
+    max_workers: int = 8
+    retries: int = 5
+    backoff_sec: float = 1.5
 
 
 class WorldBankSettings(BaseModel):

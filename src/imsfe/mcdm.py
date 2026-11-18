@@ -76,11 +76,19 @@ def score_vikor(
     *,
     v: float = 0.5,
 ) -> pd.Series:
-    """VIKOR via pymcdm. Returns ``-Q`` so that higher is better."""
-    cols = list(matrix.columns)
-    w = _flat_weights_array(weights, cols)
-    types = _types_vector(cols, directions)
-    q = VIKOR(v=v)(matrix.to_numpy(dtype=float), w, types)
+    """VIKOR via pymcdm. Returns ``-Q`` so that higher is better.
+
+    Constant criteria (zero range) are dropped before calling pymcdm, which
+    otherwise raises when ``fstar == fminus``.
+    """
+    varying = [c for c in matrix.columns if matrix[c].nunique(dropna=True) > 1]
+    if len(varying) < 1:
+        return pd.Series(0.0, index=matrix.index, name="score", dtype=float)
+    mat = matrix[varying]
+    w_obj = weights.restrict(varying)
+    w = _flat_weights_array(w_obj, varying)
+    types = _types_vector(varying, directions)
+    q = VIKOR(v=v)(mat.to_numpy(dtype=float), w, types)
     return pd.Series(-np.asarray(q, dtype=float), index=matrix.index, name="score")
 
 

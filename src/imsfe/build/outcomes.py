@@ -35,6 +35,7 @@ def add_outcomes(
         y_int = []
         y_ext = []
         y_level = []
+        y_growth = []
         for o, d, t, x_t in zip(
             out["iso3_o"], out["iso3_d"], out["year"], out["X_ijt"], strict=False
         ):
@@ -43,6 +44,7 @@ def add_outcomes(
                 y_int.append(np.nan)
                 y_ext.append(np.nan)
                 y_level.append(np.nan)
+                y_growth.append(np.nan)
                 continue
             x_fut = lookup.loc[key_fut]
             if isinstance(x_fut, pd.Series):
@@ -51,6 +53,7 @@ def add_outcomes(
                 x_fut = float(x_fut)
             x0 = float(x_t) if pd.notna(x_t) else 0.0
             y_level.append(x_fut)
+            y_growth.append(np.log(x_fut + 1.0) - np.log(x0 + 1.0))
             if x0 > thr:
                 y_int.append(np.log(x_fut + 1.0) - np.log(x0 + 1.0))
             else:
@@ -59,6 +62,22 @@ def add_outcomes(
         out[f"y_int_k{k}"] = y_int
         out[f"y_ext_k{k}"] = y_ext
         out[f"y_level_k{k}"] = y_level
+        out[f"y_growth_k{k}"] = y_growth
+
+    # New-markets mask at t: origin's destination share below the origin-year median.
+    # Relevance for ranking is future flow y_level_k (set only on the masked rows).
+    share = out.groupby(["iso3_o", "year"], sort=False)["X_ijt"].transform(
+        lambda s: s / s.sum() if float(s.sum()) > 0 else np.nan
+    )
+    med = out.assign(_share=share).groupby(["iso3_o", "year"], sort=False)["_share"].transform(
+        "median"
+    )
+    new_market = share < med
+    out["new_market_at_t"] = new_market.astype(bool)
+    for k in ks:
+        level_col = f"y_level_k{k}"
+        nm = out[level_col].where(new_market, other=np.nan)
+        out[f"y_newmarket_k{k}"] = nm
 
     out.attrs["entry_threshold_usd"] = thr
     out.attrs["horizons"] = ks

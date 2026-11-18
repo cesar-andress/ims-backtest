@@ -1,0 +1,19 @@
+criterion,factor,legacy_variables,mapped
+ASIASH,competition,CUTA,True
+CULT,product_fit,CUDI,True
+DIST,cost_access,INTC,True
+EOC,openness_legacy,CLI,True
+FTA,cost_access,PPAD,True
+GDPPC,demand,unmapped,False
+GOV,institutional,"FSIN, INRI, DEIN",True
+GRW,demand,unmapped,False
+HHI,competition,CCTI,True
+IMPC,demand,unmapped,False
+IMPV,demand,unmapped,False
+INFL,macro_risk,INAN,True
+LANG,product_fit,GLIN,True
+LPI,logistics,LPIN,True
+REEXP,openness_legacy,unmapped,False
+TARIF,cost_access,CIBC,True
+UNEMP,macro_risk,UNRA,True
+UVGAP,product_fit,unmapped,False

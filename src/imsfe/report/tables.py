@@ -16,6 +16,7 @@ from imsfe.build.descriptives import (
 )
 from imsfe.config import config_dir, load_variables
 from imsfe.countries import country_name
+from imsfe.expert_mapping import load_expert_mapping, unmapped_criteria
 from imsfe.report.format_util import write_table_bundle
 from imsfe.weights import LEGACY_FACTOR_MAP, weights_expert_mean
 
@@ -94,10 +95,13 @@ def build_t2() -> dict[str, Path]:
         }
     )
     kw = float(expert.get("kendall_w_factors", float("nan")))
+    emap = load_expert_mapping()
+    unmapped = unmapped_criteria(emap)
     notes = (
         f"Legacy expert panel (n={expert.get('n_experts', '?')}); "
         f"Kendall W on factor ratings = {kw:.4f}. "
-        "IMSFE 2.0 factors inherit mapped legacy means; unmapped factors share residual mass."
+        "IMSFE 2.0 factors inherit mapped legacy means; unmapped factors share residual mass. "
+        f"Unmapped criteria (expert_mapping.yaml): {', '.join(unmapped) if unmapped else 'none'}."
     )
     paths = write_table_bundle(
         df,
@@ -112,6 +116,29 @@ def build_t2() -> dict[str, Path]:
         "T2_expert_weights_mapped",
         title="T2b. IMSFE 2.0 factor weights derived from expert means",
         float_digits=4,
+    )
+    # Explicit criterion → legacy Excel map (including unmapped)
+    crit_rows = []
+    meta = {v.id: v for v in load_variables().variables}
+    for vid, raw in sorted(emap.items()):
+        crit_rows.append(
+            {
+                "criterion": vid,
+                "factor": meta[vid].factor if vid in meta else "",
+                "legacy_variables": (
+                    "unmapped" if raw == "unmapped" else ", ".join(raw)
+                ),
+                "mapped": raw != "unmapped",
+            }
+        )
+    write_table_bundle(
+        pd.DataFrame(crit_rows),
+        "T2_expert_mapping",
+        title="T2c. Criterion → legacy Excel variable mapping",
+        notes=(
+            "Unmapped criteria are listed explicitly. SMAA dispersion for unmapped "
+            "uses the empirical SD of mapped experts within the same factor."
+        ),
     )
     # Also store Kendall W as a one-row CSV for provenance
     pd.DataFrame(
@@ -170,6 +197,8 @@ def build_t4() -> dict[str, Path]:
     for stem, title in (
         ("T4_learned_vs_expert_weights", "T4b. Learned vs expert variable weights"),
         ("T4_shap_factor_importance", "T4c. SHAP vs expert vs learned factor shares"),
+        ("T4_paired_lift", "T4d. Paired bootstrap lift vs import_volume / gravity / random"),
+        ("T4_learned_absent_variables", "T4e. Variables with no training-window data (weight 0)"),
     ):
         df = _read_csv(f"{stem}.csv")
         if df is not None:
@@ -214,19 +243,32 @@ def build_t7() -> dict[str, Path]:
 
 
 def build_t8() -> dict[str, Path]:
+    paths: dict[str, Path] = {}
     t8 = _read_csv("T8_smaa_col.csv")
-    if t8 is None:
-        return {}
-    if "dest" in t8.columns and "country" not in t8.columns:
-        t8 = t8.copy()
-        t8.insert(1, "country", t8["dest"].map(lambda x: country_name(str(x))))
-    return write_table_bundle(
-        t8,
-        "T8_smaa_col",
-        title="T8. Colombia case: top destinations with SMAA probabilities",
-        float_digits=4,
-        iso_cols=(),
-    )
+    if t8 is not None:
+        if "dest" in t8.columns and "country" not in t8.columns:
+            t8 = t8.copy()
+            t8.insert(1, "country", t8["dest"].map(lambda x: country_name(str(x))))
+        paths.update(
+            write_table_bundle(
+                t8,
+                "T8_smaa_col",
+                title="T8. Colombia case: top destinations with SMAA probabilities",
+                float_digits=4,
+                iso_cols=(),
+            )
+        )
+    sens = _read_csv("T8_smaa_unmapped_dispersion_sensitivity.csv")
+    if sens is not None:
+        paths.update(
+            write_table_bundle(
+                sens,
+                "T8_smaa_unmapped_dispersion_sensitivity",
+                title="T8b. SMAA sensitivity: mapped-factor SD vs fixed CV for unmapped criteria",
+                float_digits=4,
+            )
+        )
+    return paths
 
 
 def build_t9() -> dict[str, Path]:

@@ -112,20 +112,25 @@ def coverage_wits(settings: Settings) -> list[str]:
         return _section(
             "WITS",
             [
-                "- **WITS**: missing — place HS-chapter AHS CSVs in `data/manual/wits/` "
-                "(see README)."
+                "- **WITS**: missing — TRN API download not yet run "
+                "(`imsfe download` / `make download`)."
             ],
         )
     df = pd.read_parquet(path)
-    years = set(df["year"].astype(int))
+    years = set(df["year"].astype(int)) if len(df) else set()
     expected = set(_year_span(settings))
+    if years:
+        year_span = f"{min(years)}–{max(years)}"
+    else:
+        year_span = "none"
     lines = [
-        f"- **WITS**: rows={len(df)}, reporters={df['reporter_iso3'].nunique()}, "
-        f"partners={df['partner_iso3'].nunique()}, "
-        f"years={min(years)}–{max(years)}, "
+        f"- **WITS (TRN API)**: rows={len(df)}, "
+        f"reporters={df['reporter_iso3'].nunique() if len(df) else 0}, "
+        f"partners={df['partner_iso3'].nunique() if len(df) else 0}, "
+        f"years={year_span}, "
         f"missing_year_share={_missing_share(years, expected):.3f}"
     ]
-    if "hs_chapter" in df.columns:
+    if "hs_chapter" in df.columns and len(df):
         chapters = sorted(df["hs_chapter"].astype(str).unique())
         lines.append(f"  - hs_chapter values: {chapters}")
         expected_ch = set(settings.hs_chapter_codes())
@@ -134,6 +139,24 @@ def coverage_wits(settings: Settings) -> list[str]:
             f"  - missing_chapter_share_vs_settings="
             f"{_missing_share(observed_ch, expected_ch):.3f}"
         )
+    if "tarif_locf" in df.columns and len(df):
+        n_locf = int(df["tarif_locf"].fillna(False).astype(bool).sum())
+        n_obs = int(df["ahs_simple_avg"].notna().sum()) if "ahs_simple_avg" in df.columns else 0
+        share = (n_locf / n_obs) if n_obs else float("nan")
+        lines.append(
+            f"  - LOCF: enabled in settings={getattr(settings.wits, 'locf', True)}; "
+            f"flagged_cells={n_locf}; share_of_nonnull={share:.3f}"
+        )
+        lines.append(
+            "  - LOCF fills carry the last observed AHS forward within "
+            "(reporter, partner, chapter); flagged in column `tarif_locf`."
+        )
+    elif getattr(settings.wits, "locf", True):
+        lines.append("  - LOCF: configured but `tarif_locf` column absent in parquet.")
+    cache_dir = raw_dir() / "wits"
+    if cache_dir.is_dir():
+        n_xml = len(list(cache_dir.glob("trn_*.xml")))
+        lines.append(f"  - cached TRN XML files: {n_xml}")
     return _section("WITS", lines)
 
 

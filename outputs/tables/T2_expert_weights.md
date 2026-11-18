@@ -1,6 +1,6 @@
 # T2. Expert weights (mean, SD, CV) and Kendall W
 
-Legacy expert panel (n=15); Kendall W on factor ratings = 0.2190. IMSFE 2.0 factors inherit mapped legacy means; unmapped factors share residual mass.
+Legacy expert panel (n=15); Kendall W on factor ratings = 0.2190. IMSFE 2.0 factors inherit mapped legacy means; unmapped factors share residual mass. Unmapped criteria (expert_mapping.yaml): GDPPC, GRW, IMPC, IMPV, REEXP, UVGAP.
 
 | level    | id   | parent   |   mean |     sd |     cv |   min |   max |
 |:---------|:-----|:---------|-------:|-------:|-------:|------:|------:|

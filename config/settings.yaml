@@ -42,14 +42,17 @@ cepii_gravity:
   version: "202211"
   url: "https://www.cepii.fr/DATA_DOWNLOAD/gravity/data/Gravity_csv_V202211.zip"
 
-# WITS TradeStats tariff SDMX (AHS simple average). Chapter-level product codes
-# are not exposed as a single key; API attempts use product=Total as a probe and
-# prefer human CSV exports under data/manual/wits/ for HS-chapter AHS averages.
+# WITS TRN SDMX (applied preferential AHS). Reporters = destinations
+# (EU members → 918); partners = origins; HS6 lines aggregated to chapter means.
 wits:
-  version: "trains-ahs"
-  base_url: "https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_TradeStats_Tariff"
+  version: "trn-ahs-v1"
+  base_url: "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN"
   indicator: "AHS-SMPL-AVRG"
-  product: "Total"
+  product: "all"
+  locf: true
+  max_workers: 8
+  retries: 5
+  backoff_sec: 1.5
 
 worldbank:
   wdi_source_id: 2
