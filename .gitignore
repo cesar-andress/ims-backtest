@@ -46,9 +46,11 @@ data/manual/cepii_gravity/*
 data/manual/hofstede/*
 !data/manual/hofstede/README.md
 
-# Run logs (keep the reproducible build manifest)
+# Run logs (keep the reproducible build manifest + refs check)
 outputs/logs/*
 !outputs/logs/build.json
+!outputs/logs/refs_check.md
+!outputs/logs/refs_check.json
 
 # Never in this repo, wherever they appear
 *.tex
