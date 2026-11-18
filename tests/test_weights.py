@@ -51,8 +51,11 @@ def test_entropy_and_critic_flat() -> None:
     assert np.isclose(c.flat().sum(), 1.0)
 
 
-def test_learned_not_implemented() -> None:
-    with pytest.raises(NotImplementedError, match="Phase 6"):
+def test_learned_requires_fit() -> None:
+    from imsfe.weights import clear_learned_weights
+
+    clear_learned_weights()
+    with pytest.raises(RuntimeError, match="not fitted"):
         weights_learned()
 
 

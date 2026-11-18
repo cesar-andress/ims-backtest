@@ -271,11 +271,28 @@ def flat_to_hierarchical(
     )
 
 
+_LEARNED_CACHE: Weights | None = None
+
+
+def set_learned_weights(weights: Weights) -> None:
+    """Store fitted learned weights for ``get_weights('learned')``."""
+    global _LEARNED_CACHE
+    _LEARNED_CACHE = _validate_weights(weights)
+
+
+def clear_learned_weights() -> None:
+    global _LEARNED_CACHE
+    _LEARNED_CACHE = None
+
+
 def weights_learned(*_args: Any, **_kwargs: Any) -> Weights:
-    """Interface stub — fitted in Phase 6 (predictive validation)."""
-    raise NotImplementedError(
-        "learned weights are fitted in Phase 6; use expert_mean/equal/entropy/critic here"
-    )
+    """Return fitted learned weights (Phase 6). Raises if not yet fitted."""
+    if _LEARNED_CACHE is None:
+        raise RuntimeError(
+            "learned weights are not fitted yet; call "
+            "imsfe.validation.learned.fit_learned_weights(...) first"
+        )
+    return _LEARNED_CACHE
 
 
 def get_weights(

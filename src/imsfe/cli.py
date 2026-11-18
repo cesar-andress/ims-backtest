@@ -111,6 +111,27 @@ def smaa(
 
 
 @app.command()
+def validate(
+    first_test_year: int = typer.Option(2019, "--first-test-year"),
+    horizon: int = typer.Option(1, "--horizon", "-k"),
+    boot: int | None = typer.Option(None, "--boot", help="Bootstrap reps (default settings)"),
+) -> None:
+    """Walk-forward predictive validation: T4/T5/T6 and F4."""
+    from imsfe.validation import run_validation
+
+    result = run_validation(
+        first_test_year=first_test_year,
+        horizon=horizon,
+        n_boot=boot,
+    )
+    typer.echo(f"T4 -> {result['t4_path']}")
+    typer.echo(f"T5 -> {result['t5_path']}")
+    typer.echo(f"T6 -> {result['t6_path']}")
+    typer.echo(f"F4 -> {result['f4_path']}")
+    typer.echo(result["summary"])
+
+
+@app.command()
 def report() -> None:
     """Generate tables and figures under outputs/ (stub)."""
     typer.echo("report: not implemented yet (Phase 9)")
