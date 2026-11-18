@@ -88,6 +88,29 @@ def run(
 
 
 @app.command()
+def smaa(
+    origin: str = typer.Option("COL", "--origin", "-o"),
+    year: int | None = typer.Option(None, "--year", "-y"),
+    samples: int | None = typer.Option(None, "--samples", help="Override smaa.n_samples"),
+    mode: str = typer.Option("dirichlet", "--mode", help="dirichlet | box"),
+) -> None:
+    """SMAA weight uncertainty: T8 table and F2 rank-acceptability heatmap."""
+    from imsfe.smaa import run_smaa_case
+
+    result = run_smaa_case(
+        origin=origin,
+        year=year,
+        mode=mode,  # type: ignore[arg-type]
+        n_samples=samples,
+    )
+    typer.echo(f"SMAA {result['origin']} {result['year']}: n={result['summary']['n_samples']}")
+    typer.echo(f"T8 -> {result['t8_path']}")
+    for kind, path in result["figure_paths"].items():
+        typer.echo(f"F2 ({kind}) -> {path}")
+    typer.echo(result["t8"].to_string(index=False))
+
+
+@app.command()
 def report() -> None:
     """Generate tables and figures under outputs/ (stub)."""
     typer.echo("report: not implemented yet (Phase 9)")
