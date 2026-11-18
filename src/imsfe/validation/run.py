@@ -268,6 +268,7 @@ def _plot_f4(blocks: pd.DataFrame) -> Path:
         "eoc",
         "gravity_ppml",
         "random",
+        "ml_gbm",
     ]
     sub = blocks.loc[blocks["method"].isin(keep) & blocks["ndcg@10"].notna()].copy()
     yearly = (

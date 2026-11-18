@@ -1,0 +1,30 @@
+{
+  "backend": "xgboost_cuda",
+  "best_params": {
+    "n_estimators": 160,
+    "max_depth": 5,
+    "learning_rate": 0.05,
+    "subsample": 0.9,
+    "colsample_bytree": 0.9
+  },
+  "runtime_sec": 2.188954796998587,
+  "seed": 42,
+  "n_train_int": 979,
+  "n_train_ext": 2520,
+  "n_features": 18,
+  "train_years": [
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017
+  ],
+  "test_years": [
+    2019,
+    2020,
+    2021,
+    2022
+  ],
+  "horizon": 1
+}

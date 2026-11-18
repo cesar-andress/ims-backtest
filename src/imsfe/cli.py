@@ -132,6 +132,30 @@ def validate(
 
 
 @app.command()
+def ml(
+    first_test_year: int = typer.Option(2019, "--first-test-year"),
+    horizon: int = typer.Option(1, "--horizon", "-k"),
+    boot: int | None = typer.Option(None, "--boot"),
+) -> None:
+    """GBM walk-forward benchmark + SHAP factor chart (F5); merges into T4."""
+    from imsfe.validation.ml import run_ml_benchmark
+
+    result = run_ml_benchmark(
+        first_test_year=first_test_year,
+        horizon=horizon,
+        n_boot=boot,
+    )
+    typer.echo(
+        f"ML backend={result['backend']} runtime_s={result['runtime_sec']:.2f}"
+    )
+    typer.echo(f"T4 -> {result['t4_path']}")
+    typer.echo(f"SHAP CSV -> {result['shap_csv']}")
+    for kind, path in result["figure_paths"].items():
+        typer.echo(f"F5 ({kind}) -> {path}")
+    typer.echo(result["comparison"].to_string(index=False))
+
+
+@app.command()
 def report() -> None:
     """Generate tables and figures under outputs/ (stub)."""
     typer.echo("report: not implemented yet (Phase 9)")
