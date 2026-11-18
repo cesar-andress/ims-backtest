@@ -1,0 +1,19 @@
+variable,factor,direction,source,coverage_pct
+IMPV,demand,benefit,BACI,100.0
+IMPC,demand,benefit,BACI+WB,98.42
+GRW,demand,benefit,BACI,74.74
+GDPPC,demand,benefit,WB,98.42
+DIST,cost_access,cost,CEPII Gravity,77.63
+TARIF,cost_access,cost,WITS/TRAINS,0.0
+FTA,cost_access,benefit,CEPII Gravity,77.63
+LPI,logistics,benefit,WB,40.39
+ASIASH,competition,cost,BACI,100.0
+HHI,competition,cost,BACI,100.0
+UVGAP,product_fit,cost,BACI,100.0
+CULT,product_fit,cost,Hofstede,0.0
+LANG,product_fit,benefit,CEPII Gravity,77.63
+INFL,macro_risk,cost,WB,41.0
+UNEMP,macro_risk,cost,WB,24.21
+GOV,institutional,benefit,WB WGI,98.42
+EOC,openness_legacy,benefit,WB,98.29
+REEXP,openness_legacy,cost,BACI,100.0

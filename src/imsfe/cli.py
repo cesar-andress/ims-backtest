@@ -35,10 +35,32 @@ def download(
 
 
 @app.command()
-def build() -> None:
-    """Build the origin×destination×year panel and features (stub)."""
-    typer.echo("build: not implemented yet (Phase 3)")
-    raise typer.Exit(code=1)
+def build(
+    chapter: str | None = typer.Option(
+        None, "--chapter", help="HS chapter (default: settings primary)"
+    ),
+) -> None:
+    """Build the origin×destination×year panel, features, and outcomes."""
+    import pandas as pd
+
+    from imsfe.build import run_build, top_destinations_by_impv
+
+    result = run_build(chapter=chapter)
+    typer.echo(f"panel -> {result['panel_path']}")
+    typer.echo(f"shape -> {result['shape']}")
+    typer.echo(f"T1    -> {result['t1_path']}")
+    typer.echo(f"T3    -> {result['t3_path']}")
+    typer.echo("coverage %:")
+    for _, row in result["coverage"].iterrows():
+        typer.echo(f"  {row['variable']}: {row['coverage_pct']:.1f}")
+    panel = pd.read_parquet(result["panel_path"])
+    last_year = int(panel["year"].max())
+    top = top_destinations_by_impv(panel, "COL", last_year, n=10)
+    typer.echo(f"Top-10 destinations for COL in {last_year} by IMPV:")
+    for _, row in top.iterrows():
+        typer.echo(
+            f"  {row['iso3_d']}: IMPV={row['IMPV_raw']:.0f}  X_ijt={row['X_ijt']:.0f}"
+        )
 
 
 @app.command()
