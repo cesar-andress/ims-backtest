@@ -204,7 +204,22 @@ def test_worldbank_fetch_mocked(isolated_raw: Path) -> None:
                 "value": 1.0,
             }
 
-    with patch("imsfe.download.worldbank.wb") as mock_wb:
+    from imsfe.download import worldbank as wb_mod
+
+    # Force the offline wbgapi path: bulk zip and REST must not touch the network.
+    with (
+        patch.object(
+            wb_mod,
+            "_fetch_wdi_bulk_csv",
+            side_effect=RuntimeError("bulk disabled in tests"),
+        ),
+        patch.object(
+            wb_mod,
+            "_fetch_wdi_rest",
+            side_effect=RuntimeError("rest disabled in tests"),
+        ),
+        patch("imsfe.download.worldbank.wb") as mock_wb,
+    ):
         mock_wb.db = 2
         mock_wb.series.get.return_value = {"id": "x"}
         mock_wb.data.fetch.side_effect = fake_fetch
@@ -219,7 +234,6 @@ def test_worldbank_fetch_mocked(isolated_raw: Path) -> None:
                 "GOV_WGI_CC.EST",
             ]
         ]
-        from imsfe.download import worldbank as wb_mod
 
         path = wb_mod.fetch_wdi(settings, force=True)
         assert path.is_file()

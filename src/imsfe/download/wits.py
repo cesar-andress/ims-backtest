@@ -21,8 +21,47 @@ def _manual_csv_paths() -> list[Path]:
     return sorted(folder.glob("*.csv"))
 
 
+def _try_normalize_wits_csv(path: Path) -> pd.DataFrame | None:
+    """Return a normalized frame if ``path`` matches the documented schema."""
+    required = {"reporter_iso3", "partner_iso3", "year", "hs_chapter", "ahs_simple_avg"}
+    df = pd.read_csv(path)
+    cols = {c.lower(): c for c in df.columns}
+    aliases = {
+        "reporter_iso3": ["reporter_iso3", "reporter", "reportercode"],
+        "partner_iso3": ["partner_iso3", "partner", "partnercode"],
+        "year": ["year", "period", "time"],
+        "hs_chapter": ["hs_chapter", "chapter"],
+        "ahs_simple_avg": [
+            "ahs_simple_avg",
+            "ahs",
+            "dutyvalue",
+            "simpleaverage",
+            "simple_avg_pct",
+        ],
+    }
+    if required.issubset(cols):
+        out = df.rename(columns={cols[c]: c for c in required})
+    else:
+        mapped: dict[str, str] = {}
+        for canon, alist in aliases.items():
+            for a in alist:
+                if a in cols:
+                    mapped[canon] = cols[a]
+                    break
+        if set(mapped) < required:
+            return None
+        out = df.rename(columns={mapped[k]: k for k in required})
+    out = out[list(required)].copy()
+    out["year"] = pd.to_numeric(out["year"], errors="coerce").astype("Int64")
+    out["ahs_simple_avg"] = pd.to_numeric(out["ahs_simple_avg"], errors="coerce")
+    out["hs_chapter"] = out["hs_chapter"].astype(str).str.zfill(2)
+    out = out.dropna(subset=["year", "ahs_simple_avg"])
+    out["year"] = out["year"].astype(int)
+    return out
+
+
 def load_manual_wits_csvs(paths: list[Path] | None = None) -> pd.DataFrame:
-    """Load human WITS exports. Required columns documented in data/manual/README.md."""
+    """Load human WITS exports. Required columns documented in data/manual/wits/README.md."""
     files = paths if paths is not None else _manual_csv_paths()
     if not files:
         raise FileNotFoundError(
@@ -30,53 +69,23 @@ def load_manual_wits_csvs(paths: list[Path] | None = None) -> pd.DataFrame:
             "See data/manual/wits/README.md for export settings."
         )
     frames: list[pd.DataFrame] = []
-    required = {"reporter_iso3", "partner_iso3", "year", "hs_chapter", "ahs_simple_avg"}
+    skipped: list[str] = []
     for path in files:
-        df = pd.read_csv(path)
-        cols = {c.lower(): c for c in df.columns}
-        # Accept a few aliases.
-        rename = {}
-        aliases = {
-            "reporter_iso3": ["reporter_iso3", "reporter", "reportercode"],
-            "partner_iso3": ["partner_iso3", "partner", "partnercode"],
-            "year": ["year", "period", "time"],
-            "hs_chapter": ["hs_chapter", "chapter", "productcode", "product"],
-            "ahs_simple_avg": [
-                "ahs_simple_avg",
-                "ahs",
-                "dutyvalue",
-                "simpleaverage",
-                "value",
-            ],
-        }
-        # Stricter mapping for documented schema.
-        lower_set = set(cols)
-        if not required.issubset(lower_set):
-            # try alias map
-            mapped: dict[str, str] = {}
-            for canon, alist in aliases.items():
-                for a in alist:
-                    if a in cols:
-                        mapped[canon] = cols[a]
-                        break
-            if set(mapped) >= required:
-                rename = {mapped[k]: k for k in required}
-                df = df.rename(columns=rename)
-            else:
-                raise ValueError(
-                    f"{path.name} must contain columns {sorted(required)} "
-                    f"(or documented aliases); got {list(df.columns)}"
-                )
-        else:
-            df = df.rename(columns={cols[c]: c for c in required})
-        frames.append(df[list(required)].copy())
-    out = pd.concat(frames, ignore_index=True)
-    out["year"] = pd.to_numeric(out["year"], errors="coerce").astype("Int64")
-    out["ahs_simple_avg"] = pd.to_numeric(out["ahs_simple_avg"], errors="coerce")
-    out["hs_chapter"] = out["hs_chapter"].astype(str).str.zfill(2)
-    out = out.dropna(subset=["year", "ahs_simple_avg"])
-    out["year"] = out["year"].astype(int)
-    return out
+        normalized = _try_normalize_wits_csv(path)
+        if normalized is None:
+            skipped.append(path.name)
+            continue
+        frames.append(normalized)
+    if not frames:
+        raise FileNotFoundError(
+            "No schema-compatible WITS CSVs found "
+            f"(skipped non-conforming: {skipped}). "
+            "Expected columns: reporter_iso3,partner_iso3,year,hs_chapter,ahs_simple_avg. "
+            f"See {manual_dir() / 'wits' / 'README.md'}."
+        )
+    if skipped:
+        print(f"WITS: skipped non-conforming CSV(s): {skipped}")
+    return pd.concat(frames, ignore_index=True)
 
 
 def _parse_sdmx_obs_values(xml_text: str) -> list[dict[str, Any]]:
@@ -123,6 +132,8 @@ def try_wits_api_probe(settings: Settings, session: requests.Session | None = No
     connectivity. Full HS-chapter series must come from manual CSVs.
     """
     sess = session or requests.Session()
+    if session is None:
+        sess.trust_env = False  # avoid stuck proxy autodetection
     reporters = ["USA", "DEU", "CHN"]
     rows: list[dict[str, Any]] = []
     base = settings.wits.base_url.rstrip("/")
@@ -135,7 +146,10 @@ def try_wits_api_probe(settings: Settings, session: requests.Session | None = No
                 f"{base}/{key}"
                 f"?startPeriod={settings.years.start}&endPeriod={settings.years.end}"
             )
-            resp = sess.get(url, timeout=60)
+            try:
+                resp = sess.get(url, timeout=30)
+            except requests.RequestException:
+                continue
             if resp.status_code != 200:
                 continue
             if "Invalid" in resp.text or "error" in resp.text.lower()[:200]:

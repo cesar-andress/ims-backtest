@@ -20,6 +20,8 @@ def download_file(
         raise ValueError("Download URL is empty; set it in config/settings.yaml")
     dest.parent.mkdir(parents=True, exist_ok=True)
     sess = session or requests.Session()
+    if session is None:
+        sess.trust_env = False
     with sess.get(url, stream=True, timeout=timeout) as resp:
         if resp.status_code != 200:
             raise RuntimeError(
