@@ -1,0 +1,9 @@
+imsfe_factor,weight,legacy_map
+macro_risk,0.11500000000000002,ECON
+product_fit,0.0925,CULT
+institutional,0.098,POLI
+competition,0.14500000000000002,COMM
+logistics,0.1385,LOGI
+cost_access,0.16100000000000003,COST
+demand,0.125,(equal residual)
+openness_legacy,0.125,(equal residual)

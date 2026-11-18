@@ -1,4 +1,4 @@
-.PHONY: install test lint data build analysis outputs legacy all
+.PHONY: install test lint data build analysis validate smaa ml matrix outputs legacy all
 
 UV ?= uv
 
@@ -20,10 +20,24 @@ build:
 analysis:
 	$(UV) run imsfe run
 
-outputs:
-	$(UV) run imsfe report
+validate:
+	$(UV) run imsfe validate
+
+smaa:
+	$(UV) run imsfe smaa
+
+ml:
+	$(UV) run imsfe ml
+
+matrix:
+	$(UV) run imsfe matrix
 
 legacy:
 	$(UV) run imsfe legacy
 
-all: data build analysis outputs
+# Regenerate manuscript tables/figures from data/processed + existing analysis CSVs.
+outputs:
+	$(UV) run imsfe report
+
+# Full pipeline assuming data/raw is present (download is idempotent).
+all: data build analysis validate smaa ml matrix legacy outputs

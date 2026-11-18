@@ -180,10 +180,30 @@ def matrix_cmd(
 
 
 @app.command()
-def report() -> None:
-    """Generate tables and figures under outputs/ (stub)."""
-    typer.echo("report: not implemented yet (Phase 9)")
-    raise typer.Exit(code=1)
+def report(
+    refresh: bool = typer.Option(
+        False,
+        "--refresh",
+        help="Re-run SMAA + case matrix while regenerating F2/F3",
+    ),
+    robustness: bool = typer.Option(
+        True,
+        "--robustness/--no-robustness",
+        help="Extra origin/horizon/threshold/chapter appendix sweep",
+    ),
+) -> None:
+    """Regenerate T1–T9 (CSV+Markdown), F1–F5, and outputs/logs/build.json."""
+    from imsfe.report import run_report
+
+    result = run_report(refresh_pipelines=refresh, run_robustness=robustness)
+    typer.echo(f"manifest -> {result['manifest']}")
+    for key in ("T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "A1"):
+        if key in result["tables"] and result["tables"][key]:
+            typer.echo(f"  table {key} ok")
+    for key, val in result["figures"].items():
+        if isinstance(val, dict) and "png" in val:
+            typer.echo(f"  figure {key} -> {val['png']}")
+
 
 
 @app.command("legacy")
