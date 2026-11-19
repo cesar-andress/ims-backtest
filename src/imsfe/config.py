@@ -82,7 +82,7 @@ class SourceRefSettings(BaseModel):
 
 
 class WitsSettings(BaseModel):
-    version: str = "trn-ahs-v1"
+    version: str = "trn-ahs-v2"
     base_url: str = "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN"
     indicator: str = "AHS-SMPL-AVRG"
     product: str = "all"
@@ -90,6 +90,14 @@ class WitsSettings(BaseModel):
     max_workers: int = 8
     retries: int = 5
     backoff_sec: float = 1.5
+
+
+class MissingDataSettings(BaseModel):
+    """Block-level missing-data policy for identical candidate sets."""
+
+    max_missing_share: float = 0.20
+    impute: Literal["median"] = "median"
+    min_candidates: int = 20
 
 
 class WorldBankSettings(BaseModel):
@@ -118,6 +126,7 @@ class Settings(BaseModel):
     baci: SourceRefSettings = Field(default_factory=SourceRefSettings)
     cepii_gravity: SourceRefSettings = Field(default_factory=SourceRefSettings)
     wits: WitsSettings = Field(default_factory=WitsSettings)
+    missing_data: MissingDataSettings = Field(default_factory=MissingDataSettings)
     worldbank: WorldBankSettings = Field(default_factory=WorldBankSettings)
     smaa: SmaaSettings = Field(default_factory=SmaaSettings)
     bootstrap: BootstrapSettings = Field(default_factory=BootstrapSettings)

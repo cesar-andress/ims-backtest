@@ -17,7 +17,7 @@ from imsfe.matrix import (
 )
 
 
-def _toy_panel(n_dest: int = 12, year: int = 2020) -> pd.DataFrame:
+def _toy_panel(n_dest: int = 25, year: int = 2020) -> pd.DataFrame:
     rng = np.random.default_rng(0)
     dests = [f"D{i:02d}" for i in range(n_dest)]
     rows = []

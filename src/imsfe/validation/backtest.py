@@ -12,7 +12,7 @@ import pandas as pd
 from imsfe.config import VariablesConfig, load_experiments, load_settings, load_variables
 from imsfe.mcdm import hierarchical_wsm, score
 from imsfe.normalize import normalize_matrix
-from imsfe.run_experiments import _directions, _feature_columns, _prepare_slice
+from imsfe.run_experiments import _directions, _feature_columns
 from imsfe.validation.metrics import evaluate_ranking
 from imsfe.weights import Weights, get_weights
 
@@ -73,14 +73,24 @@ def score_slice(
     normalization: str,
     method: str,
     weights: Weights,
-) -> pd.Series:
-    """Score destinations for one origin-year group; index = iso3_d."""
+    return_meta: bool = False,
+) -> pd.Series | tuple[pd.Series, dict[str, object]]:
+    """Score destinations for one origin-year group; index = iso3_d.
+
+    Candidate set is fixed (all destinations in ``group``); missing-data policy
+    from ``settings.missing_data``.
+    """
+    from imsfe.block_prep import block_meta_dict, prepare_block
+
     cols = _feature_columns(variables)
     directions = _directions(variables)
-    dest = group.set_index("iso3_d")
-    complete, usable = _prepare_slice(dest[cols], cols)
+    prep = prepare_block(group, cols)
+    complete = prep.matrix
+    usable = prep.used_variables
+    meta = block_meta_dict(prep)
     if complete.empty or len(complete) < 2:
-        return pd.Series(dtype=float)
+        empty = pd.Series(dtype=float)
+        return (empty, meta) if return_meta else empty
     dirs = {c: directions[c] for c in usable}
     w = weights.restrict(usable)
     normalized = normalize_matrix(complete, dirs, normalization)  # type: ignore[arg-type]
@@ -91,7 +101,11 @@ def score_slice(
         method,  # type: ignore[arg-type]
         normalized=normalized,
     )
-    return sc.replace([np.inf, -np.inf], np.nan).dropna()
+    sc = sc.replace([np.inf, -np.inf], np.nan)
+    # Keep all candidates; non-finite scores are rare after preparation.
+    if return_meta:
+        return sc, meta
+    return sc
 
 
 def factor_scores_slice(
@@ -102,10 +116,13 @@ def factor_scores_slice(
     weights: Weights,
 ) -> pd.DataFrame:
     """Hierarchical factor scores for one origin-year (before factor aggregation)."""
+    from imsfe.block_prep import prepare_block
+
     cols = _feature_columns(variables)
     directions = _directions(variables)
-    dest = group.set_index("iso3_d")
-    complete, usable = _prepare_slice(dest[cols], cols)
+    prep = prepare_block(group, cols)
+    complete = prep.matrix
+    usable = prep.used_variables
     if complete.empty:
         return pd.DataFrame()
     dirs = {c: directions[c] for c in usable}
@@ -182,10 +199,13 @@ def score_with_variable_subset(
     normalization: str = "minmax",
 ) -> pd.Series:
     """Equal-within-available-factor WSM on a variable subset (ablation)."""
+    from imsfe.block_prep import prepare_block
+
     directions = _directions(variables)
-    dest = group.set_index("iso3_d")
-    present = [v for v in variable_ids if v in dest.columns]
-    complete, usable = _prepare_slice(dest[present], present)
+    present = [v for v in variable_ids if v in group.columns]
+    prep = prepare_block(group, present)
+    complete = prep.matrix
+    usable = prep.used_variables
     if complete.empty or len(complete) < 2:
         return pd.Series(dtype=float)
     # Equal hierarchical weights over factors that still have variables
@@ -275,8 +295,19 @@ def collect_method_metrics(
     if learned_weights is not None:
         cached["learned"] = learned_weights
 
+    from imsfe.block_prep import block_meta_dict, prepare_block
+
     test = panel.loc[panel["year"].isin(split.test_feature_years)]
     for (origin, year), group in test.groupby(["iso3_o", "year"], sort=True):
+        # Fixed candidate set for this block (identical across methods).
+        cols = _feature_columns(variables)
+        prep = prepare_block(group, cols)
+        block_meta = block_meta_dict(prep)
+        cand = list(prep.candidates)
+
+        def _restrict(sc: pd.Series, _cand: list[str] = cand) -> pd.Series:
+            return sc.reindex(_cand)
+
         # Method configs
         for spec in method_specs:
             name = spec["name"]
@@ -284,26 +315,26 @@ def collect_method_metrics(
             if wscheme == "learned" and learned_weights is None:
                 continue
             if wscheme in ("entropy", "critic"):
-                cols = _feature_columns(variables)
-                dest = group.set_index("iso3_d")
-                complete, usable = _prepare_slice(dest[cols], cols)
-                if complete.empty:
-                    continue
-                dirs = {c: _directions(variables)[c] for c in usable}
+                dirs = {c: _directions(variables)[c] for c in prep.used_variables}
                 weights = get_weights(
-                    wscheme, variables, matrix=complete, directions=dirs
+                    wscheme,
+                    variables,
+                    matrix=prep.matrix,
+                    directions=dirs,
                 )
             else:
                 weights = cached.get(wscheme) or get_weights(wscheme, variables)
-            sc = score_slice(
+            sc, meta = score_slice(
                 group,
                 variables=variables,
                 normalization=spec["normalization"],
                 method=spec["method"],
                 weights=weights,
+                return_meta=True,
             )
             if sc.empty:
                 continue
+            sc = _restrict(sc)
             mets = metrics_for_scores(
                 sc, group, horizon=split.horizon, target=target
             )
@@ -315,19 +346,21 @@ def collect_method_metrics(
                     "family": "ims",
                     "target": target,
                     "horizon": int(split.horizon),
+                    **block_meta,
                     **mets,
                 }
             )
 
-        # Baselines
+        # Baselines — same candidate index as IMS methods
         for b in baselines:
             if b == "equal_weights":
-                sc = score_slice(
+                sc, _meta = score_slice(
                     group,
                     variables=variables,
                     normalization="minmax",
                     method="wsm",
                     weights=cached["equal"],
+                    return_meta=True,
                 )
             elif b == "gravity_ppml":
                 if gravity_score_table is None:
@@ -341,7 +374,7 @@ def collect_method_metrics(
                 acc: list[dict[str, float]] = []
                 for s in range(random_seeds):
                     rng = np.random.default_rng(settings.seed + s)
-                    sc_r = baseline_scores(group, "random", rng=rng)
+                    sc_r = _restrict(baseline_scores(group, "random", rng=rng))
                     acc.append(
                         metrics_for_scores(
                             sc_r, group, horizon=split.horizon, target=target
@@ -358,6 +391,7 @@ def collect_method_metrics(
                         "family": "baseline",
                         "target": target,
                         "horizon": int(split.horizon),
+                        **block_meta,
                         **avg,
                     }
                 )
@@ -366,6 +400,7 @@ def collect_method_metrics(
                 sc = baseline_scores(group, b)
             if sc is None or sc.empty:
                 continue
+            sc = _restrict(sc)
             mets = metrics_for_scores(
                 sc, group, horizon=split.horizon, target=target
             )
@@ -377,6 +412,7 @@ def collect_method_metrics(
                     "family": "baseline",
                     "target": target,
                     "horizon": int(split.horizon),
+                    **block_meta,
                     **mets,
                 }
             )
@@ -388,6 +424,7 @@ def collect_method_metrics(
             )
             if sc.empty:
                 continue
+            sc = _restrict(sc)
             mets = metrics_for_scores(
                 sc, group, horizon=split.horizon, target=target
             )
@@ -399,6 +436,7 @@ def collect_method_metrics(
                     "family": "ablation",
                     "target": target,
                     "horizon": int(split.horizon),
+                    **block_meta,
                     **mets,
                 }
             )

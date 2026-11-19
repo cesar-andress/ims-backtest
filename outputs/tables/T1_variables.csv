@@ -4,7 +4,7 @@ IMPC,HS chapter imports per capita,demand,benefit,BACI+WB,log,98.33
 GRW,HS chapter import growth (3-year CAGR),demand,benefit,BACI,none,75.0
 GDPPC,GDP per capita PPP,demand,benefit,WB,log,98.33
 DIST,Population-weighted distance,cost_access,cost,CEPII Gravity,log,81.94
-TARIF,"Applied preferential tariff (AHS), origin to destination",cost_access,cost,WITS/TRAINS,none,37.22
+TARIF,"Applied preferential tariff (AHS), origin to destination",cost_access,cost,WITS/TRAINS,none,94.86
 FTA,Preferential trade agreement in force,cost_access,benefit,CEPII Gravity,none,81.94
 LPI,Logistics Performance Index (overall),logistics,benefit,WB,none,40.42
 ASIASH,China+Vietnam share of destination HS imports,competition,cost,BACI,none,100.0

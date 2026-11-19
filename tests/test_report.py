@@ -57,14 +57,15 @@ def test_extra_robustness_toy() -> None:
     rows = []
     for year in range(2016, 2022):
         for o in ("COL", "PER"):
-            for i, d in enumerate(["USA", "NLD", "DEU", "CHN", "BRA", "MEX"]):
+            dests = [f"D{i:02d}" for i in range(25)]
+            for i, d in enumerate(dests):
                 rows.append(
                     {
                         "iso3_o": o,
                         "iso3_d": d,
                         "year": year,
                         "hs_chapter": "64",
-                        "X_ijt": float(1000 * (6 - i) + year),
+                        "X_ijt": float(1000 * (25 - i) + year),
                         "IMPV": float(rng.uniform(1, 10)),
                         "IMPC": float(rng.uniform(1, 10)),
                         "GRW": float(rng.uniform(-1, 1)),

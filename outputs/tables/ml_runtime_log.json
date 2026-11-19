@@ -1,13 +1,13 @@
 {
   "backend": "lightgbm_cpu",
   "best_params": {
-    "n_estimators": 80,
+    "n_estimators": 160,
     "max_depth": 3,
     "learning_rate": 0.05,
     "subsample": 0.9,
     "colsample_bytree": 0.9
   },
-  "runtime_sec": 0.7409734210013994,
+  "runtime_sec": 0.7695871230098419,
   "seed": 42,
   "n_train_int": 979,
   "n_train_ext": 2520,

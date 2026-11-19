@@ -2,7 +2,7 @@
   "origin": "COL",
   "year": 2023,
   "hs_chapter": "64",
-  "n_destinations": 31,
+  "n_destinations": 60,
   "attr_used": [
     "IMPV",
     "IMPC",
@@ -24,8 +24,8 @@
     "FTA"
   ],
   "fit_dropped": [],
-  "attr_cut_median": 6.5983599512449675,
-  "fit_cut_median": 6.268671544951969,
+  "attr_cut_median": 5.586398095857769,
+  "fit_cut_median": 5.286673406256746,
   "locf_fit": {
     "DIST": {
       "n_filled": 59,

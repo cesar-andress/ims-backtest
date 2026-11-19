@@ -45,7 +45,7 @@ cepii_gravity:
 # WITS TRN SDMX (applied preferential AHS). Reporters = destinations
 # (EU members → 918); partners = origins; HS6 lines aggregated to chapter means.
 wits:
-  version: "trn-ahs-v1"
+  version: "trn-ahs-v2"
   base_url: "https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN"
   indicator: "AHS-SMPL-AVRG"
   product: "all"
@@ -53,6 +53,12 @@ wits:
   max_workers: 8
   retries: 5
   backoff_sec: 1.5
+
+# Block-level missing-data policy for scoring (identical candidate set).
+missing_data:
+  max_missing_share: 0.20
+  impute: median
+  min_candidates: 20
 
 worldbank:
   wdi_source_id: 2

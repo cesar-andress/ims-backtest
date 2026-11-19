@@ -34,7 +34,7 @@ from imsfe.config import Settings, VariablesConfig, load_settings, load_variable
 from imsfe.expert_mapping import load_expert_mapping, mapped_legacy_ids
 from imsfe.mcdm import score
 from imsfe.normalize import normalize_matrix
-from imsfe.run_experiments import _directions, _feature_columns, _prepare_slice
+from imsfe.run_experiments import _directions, _feature_columns
 from imsfe.weights import (
     LEGACY_FACTOR_MAP,
     Weights,
@@ -493,17 +493,20 @@ def prepare_origin_year_matrices(
     normalization: str = "minmax",
     variables: VariablesConfig | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str], Weights]:
-    """Raw complete matrix, normalised matrix, directions, restricted expert weights."""
+    """Prepared matrix (fixed candidates), normalised matrix, directions, weights."""
+    from imsfe.block_prep import prepare_block
+
     variables = variables or load_variables()
     group = panel.loc[(panel["iso3_o"] == origin) & (panel["year"] == year)]
     if group.empty:
         raise ValueError(f"No panel rows for {origin}/{year}")
     cols = _feature_columns(variables)
     directions = _directions(variables)
-    dest = group.set_index("iso3_d")
-    complete, usable = _prepare_slice(dest[cols], cols)
+    prep = prepare_block(group, cols)
+    complete = prep.matrix
+    usable = prep.used_variables
     if complete.empty or len(complete) < 2:
-        raise ValueError(f"Insufficient complete destinations for {origin}/{year}")
+        raise ValueError(f"Insufficient destinations for {origin}/{year}")
     dirs = {c: directions[c] for c in usable}
     normalized = normalize_matrix(complete, dirs, normalization)  # type: ignore[arg-type]
     center = weights_expert_mean(variables).restrict(usable)

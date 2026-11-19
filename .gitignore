@@ -71,3 +71,5 @@ outputs/logs/*
 *.swp
 *~
 .~lock.*
+
+!outputs/logs/phase12_*.csv

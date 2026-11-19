@@ -40,16 +40,22 @@ def _prepare_slice(
     raw: pd.DataFrame,
     columns: list[str],
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Drop all-NaN columns and rows with any NaN among remaining columns."""
-    usable = [c for c in columns if c in raw.columns and raw[c].notna().any()]
-    if not usable:
+    """Legacy helper retained for descriptives; prefer ``prepare_block``.
+
+    Builds a temporary frame with ``iso3_d`` from the index and applies the
+    fixed-candidate missing-data policy.
+    """
+    from imsfe.block_prep import prepare_block
+
+    if raw.empty:
         return pd.DataFrame(index=raw.index), []
-    sub = raw[usable]
-    # Drop columns that are still all-NaN after selection (defensive)
-    usable = [c for c in usable if sub[c].notna().any()]
-    sub = sub[usable]
-    complete = sub.dropna(axis=0, how="any")
-    return complete, usable
+    tmp = raw.copy()
+    tmp = tmp.reset_index()
+    # Index name may already be iso3_d
+    if "iso3_d" not in tmp.columns:
+        tmp = tmp.rename(columns={tmp.columns[0]: "iso3_d"})
+    prep = prepare_block(tmp, columns)
+    return prep.matrix, prep.used_variables
 
 
 def score_origin_year(
@@ -62,18 +68,20 @@ def score_origin_year(
     cached_weights: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Score one (origin, year) cross-section; returns dest/score/rank rows."""
+    from imsfe.block_prep import prepare_block
+
     directions = _directions(variables)
     cols = _feature_columns(variables)
-    dest_index = group.set_index("iso3_d")
-    raw = dest_index[cols]
-    complete, usable = _prepare_slice(raw, cols)
+    prep = prepare_block(group, cols)
+    complete = prep.matrix
+    usable = prep.used_variables
     if complete.empty or len(complete) < 2:
         return pd.DataFrame(
             columns=["dest", "score", "rank", "n_alternatives", "n_criteria"]
         )
 
     dirs = {c: directions[c] for c in usable}
-    # Objective weights from the raw complete matrix
+    # Objective weights from the prepared matrix
     if weight_scheme in ("entropy", "critic"):
         weights = get_weights(
             weight_scheme, variables, matrix=complete, directions=dirs
@@ -92,7 +100,10 @@ def score_origin_year(
         method,  # type: ignore[arg-type]
         normalized=normalized,
     )
-    sc = sc.replace([np.inf, -np.inf], np.nan).dropna()
+    sc = sc.replace([np.inf, -np.inf], np.nan)
+    if sc.isna().any():
+        # Should not happen with prepared matrix; drop only non-finite scores.
+        sc = sc.dropna()
     if sc.empty or len(sc) < 2:
         return pd.DataFrame(
             columns=["dest", "score", "rank", "n_alternatives", "n_criteria"]

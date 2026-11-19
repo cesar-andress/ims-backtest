@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -206,32 +207,80 @@ def apply_locf(
     *,
     value_col: str = "ahs_simple_avg",
     flag_col: str = "tarif_locf",
+    source_col: str = "tarif_source",
     enabled: bool = True,
 ) -> pd.DataFrame:
     """Last-observation-carried-forward by (dest, origin, chapter); flag fills.
 
-    ``panel`` must contain columns ``reporter_iso3``, ``partner_iso3``,
-    ``hs_chapter``, ``year``, and ``value_col``.
+    Only pairs that already have at least one non-null ``value_col`` observation
+    are forward-filled. Pairs that are entirely missing stay missing (MFN fill
+    happens later). LOCF cells get ``tarif_source='partner_locf'``.
     """
     if panel.empty:
         out = panel.copy()
         out[flag_col] = pd.Series(dtype=bool)
+        if source_col not in out.columns:
+            out[source_col] = pd.Series(dtype=object)
         return out
     out = panel.sort_values(
         ["reporter_iso3", "partner_iso3", "hs_chapter", "year"]
     ).copy()
     out[flag_col] = False
+    if source_col not in out.columns:
+        out[source_col] = pd.NA
+    # Observed partner-specific cells
+    obs = out[value_col].notna()
+    src_missing = out[source_col].isna() | (out[source_col].astype(str) == "<NA>")
+    out.loc[obs & src_missing, source_col] = "partner_specific"
     if not enabled:
         return out
     keys = ["reporter_iso3", "partner_iso3", "hs_chapter"]
     filled_parts: list[pd.DataFrame] = []
     for _, g in out.groupby(keys, sort=False):
         gg = g.copy()
+        if not gg[value_col].notna().any():
+            filled_parts.append(gg)
+            continue
         before = gg[value_col].isna()
         gg[value_col] = gg[value_col].ffill()
-        gg[flag_col] = before & gg[value_col].notna()
+        locf_mask = before & gg[value_col].notna()
+        gg.loc[locf_mask, flag_col] = True
+        gg.loc[locf_mask, source_col] = "partner_locf"
         filled_parts.append(gg)
     return pd.concat(filled_parts, ignore_index=True)
+
+
+def apply_mfn_fallback(
+    panel: pd.DataFrame,
+    mfn: pd.DataFrame,
+    *,
+    value_col: str = "ahs_simple_avg",
+    source_col: str = "tarif_source",
+) -> pd.DataFrame:
+    """Fill never-observed partner pairs with reporter-year MFN (partner 000).
+
+    ``mfn`` columns: ``reporter_iso3``, ``year``, ``hs_chapter``, ``mfn_simple_avg``.
+    """
+    if panel.empty:
+        return panel.copy()
+    out = panel.copy()
+    if source_col not in out.columns:
+        out[source_col] = pd.NA
+    if mfn.empty:
+        return out
+    m = mfn.rename(columns={"mfn_simple_avg": "_mfn"}).copy()
+    m["hs_chapter"] = m["hs_chapter"].astype(str).str.zfill(2)
+    out = out.merge(
+        m[["reporter_iso3", "year", "hs_chapter", "_mfn"]],
+        on=["reporter_iso3", "year", "hs_chapter"],
+        how="left",
+    )
+    fill = out[value_col].isna() & out["_mfn"].notna()
+    out.loc[fill, value_col] = out.loc[fill, "_mfn"]
+    out.loc[fill, source_col] = "mfn_no_preference"
+    if "tarif_locf" in out.columns:
+        out.loc[fill, "tarif_locf"] = False
+    return out.drop(columns=["_mfn"])
 
 
 def _get_with_retries(
@@ -467,41 +516,102 @@ def fetch_wits(settings: Settings | None = None, *, force: bool = False) -> dict
                 }
             )
 
-    df = pd.DataFrame.from_records(rows_out)
-    # Complete year grid for LOCF
-    if not df.empty:
-        grid_keys = (
-            df[["reporter_iso3", "partner_iso3", "hs_chapter"]]
-            .drop_duplicates()
-            .assign(_k=1)
-            .merge(pd.DataFrame({"year": years, "_k": 1}), on="_k")
-            .drop(columns="_k")
+    partner_obs = pd.DataFrame.from_records(rows_out)
+
+    # Full destination × origin × year × chapter grid (includes never-preferred pairs).
+    resolved_dests = sorted(set(eu_dests) | set(non_eu))
+    grid = (
+        pd.MultiIndex.from_product(
+            [resolved_dests, settings.origins, years, chapters],
+            names=["reporter_iso3", "partner_iso3", "year", "hs_chapter"],
         )
-        df = grid_keys.merge(
-            df,
-            on=["reporter_iso3", "partner_iso3", "hs_chapter", "year"],
+        .to_frame(index=False)
+    )
+    if partner_obs.empty:
+        df = grid.copy()
+        df["ahs_simple_avg"] = np.nan
+        df["n_hs6"] = pd.NA
+        df["n_na_products"] = pd.NA
+        df["tarif_source"] = pd.NA
+    else:
+        df = grid.merge(
+            partner_obs,
+            on=["reporter_iso3", "partner_iso3", "year", "hs_chapter"],
             how="left",
         )
-        df = apply_locf(df, enabled=locf)
-    else:
-        df = pd.DataFrame(
-            columns=[
-                "reporter_iso3",
-                "partner_iso3",
-                "year",
-                "hs_chapter",
-                "ahs_simple_avg",
-                "n_hs6",
-                "n_na_products",
-                "tarif_locf",
+        df["tarif_source"] = pd.NA
+    df = apply_locf(df, enabled=locf)
+
+    # MFN (partner 000) for reporter-years — fill pairs that never had preferences.
+    mfn_keys = [(rep, "000", year, "reported") for rep in unique_reporters for year in years]
+    mfn_meta: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        for fut in as_completed({pool.submit(_one, k): k for k in mfn_keys}):
+            mfn_meta.append(fut.result())
+    meta_rows.extend(mfn_meta)
+
+    mfn_frames: list[pd.DataFrame] = []
+    for meta in mfn_meta:
+        if meta["status"] != 200:
+            continue
+        path_m = Path(meta["path"])
+        if path_m.stat().st_size < 50:
+            continue
+        lines = filter_chapters(parse_trn_xml(path_m.read_bytes()), chapters)
+        if lines.empty:
+            continue
+        # Prefer aveestimated when NA lines present
+        if (lines["nbr_na_lines"].fillna(0) > 0).any():
+            ave_url_key = (meta["reporter"], "000", meta["year"], "aveestimated")
+            ave_meta = _one(ave_url_key)
+            meta_rows.append(ave_meta)
+            if ave_meta["status"] == 200 and Path(ave_meta["path"]).stat().st_size >= 50:
+                ave_lines = filter_chapters(
+                    parse_trn_xml(Path(ave_meta["path"]).read_bytes()), chapters
+                )
+                lines = merge_reported_aveestimated(lines, ave_lines)
+        mfn_frames.append(lines)
+
+    mfn_lines = pd.concat(mfn_frames, ignore_index=True) if mfn_frames else pd.DataFrame()
+    mfn_agg = aggregate_chapter_ahs(mfn_lines)
+    # Expand MFN reporter codes to destination ISO3
+    mfn_rows: list[dict[str, Any]] = []
+    for _, row in mfn_agg.iterrows():
+        rep = str(row["reporter"]).zfill(3)
+        if rep == "918" or str(int(rep)) == "918":
+            dest_list = list(eu_dests)
+        else:
+            dest_list = [
+                d
+                for d in non_eu
+                if int(wits_reporter_code(d)) == int(rep)
             ]
-        )
+        for dest in dest_list:
+            mfn_rows.append(
+                {
+                    "reporter_iso3": dest,
+                    "year": int(row["year"]),
+                    "hs_chapter": str(row["hs_chapter"]).zfill(2),
+                    "mfn_simple_avg": float(row["ahs_simple_avg"]),
+                }
+            )
+    mfn_df = pd.DataFrame.from_records(mfn_rows)
+    df = apply_mfn_fallback(df, mfn_df)
 
     path = raw_dir() / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path, index=False)
 
-    n_locf = int(df["tarif_locf"].sum()) if "tarif_locf" in df.columns else 0
+    n_locf = (
+        int(df["tarif_locf"].fillna(False).astype(bool).sum())
+        if "tarif_locf" in df.columns
+        else 0
+    )
+    n_mfn = (
+        int((df["tarif_source"] == "mfn_no_preference").sum())
+        if "tarif_source" in df.columns
+        else 0
+    )
     n_cached = sum(1 for m in meta_rows if m.get("cached"))
     record_artifact(
         "wits",
@@ -512,9 +622,10 @@ def fetch_wits(settings: Settings | None = None, *, force: bool = False) -> dict
         extra={
             "n_rows": int(len(df)),
             "n_locf": n_locf,
+            "n_mfn_no_preference": n_mfn,
             "n_api_calls": len(meta_rows),
             "n_cached": n_cached,
-            "n_destinations": len(destinations),
+            "n_destinations": len(resolved_dests),
             "chapters": chapters,
             "columns": list(df.columns),
         },
@@ -525,6 +636,7 @@ def fetch_wits(settings: Settings | None = None, *, force: bool = False) -> dict
         "url": base_url,
         "n_rows": len(df),
         "n_locf": n_locf,
+        "n_mfn_no_preference": n_mfn,
         "n_api_calls": len(meta_rows),
         "n_cached": n_cached,
     }

@@ -17,10 +17,7 @@ def _tiny_panel() -> pd.DataFrame:
     rng = np.random.default_rng(0)
     for origin in ("COL", "PER"):
         for year in (2015, 2016, 2017):
-            dests = [
-                "USA", "DEU", "CHN", "BRA", "MEX", "CAN",
-                "JPN", "GBR", "FRA", "ITA", "ESP", "NLD",
-            ]
+            dests = [f"D{i:02d}" for i in range(25)]
             for i, dest in enumerate(dests):
                 row = {
                     "iso3_o": origin,

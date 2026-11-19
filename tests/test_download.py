@@ -194,6 +194,11 @@ def test_wits_locf_flags_filled_years() -> None:
     out = wits_mod.apply_locf(panel, enabled=True)
     assert list(out["ahs_simple_avg"]) == [5.0, 5.0, 5.0]
     assert list(out["tarif_locf"]) == [False, True, True]
+    assert list(out["tarif_source"]) == [
+        "partner_specific",
+        "partner_locf",
+        "partner_locf",
+    ]
 
 
 def test_hofstede_manual_loader(isolated_raw: Path) -> None:

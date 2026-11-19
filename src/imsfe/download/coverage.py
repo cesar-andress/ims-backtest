@@ -153,6 +153,12 @@ def coverage_wits(settings: Settings) -> list[str]:
         )
     elif getattr(settings.wits, "locf", True):
         lines.append("  - LOCF: configured but `tarif_locf` column absent in parquet.")
+    if "tarif_source" in df.columns and len(df):
+        vc = df["tarif_source"].fillna("missing").value_counts()
+        parts = ", ".join(f"{k}={int(v)}" for k, v in vc.items())
+        lines.append(f"  - tarif_source counts: {parts}")
+        n_miss = int(df["ahs_simple_avg"].isna().sum()) if "ahs_simple_avg" in df.columns else 0
+        lines.append(f"  - still-missing AHS cells after MFN fallback: {n_miss}")
     cache_dir = raw_dir() / "wits"
     if cache_dir.is_dir():
         n_xml = len(list(cache_dir.glob("trn_*.xml")))

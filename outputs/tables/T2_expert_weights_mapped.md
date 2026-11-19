@@ -2,11 +2,11 @@
 
 | imsfe_factor    |   weight | legacy_map       |
 |:----------------|---------:|:-----------------|
-| cost_access     |   0.161  | COST             |
 | competition     |   0.145  | COMM             |
-| logistics       |   0.1385 | LOGI             |
-| product_fit     |   0.0925 | CULT             |
 | institutional   |   0.098  | POLI             |
+| product_fit     |   0.0925 | CULT             |
+| cost_access     |   0.161  | COST             |
+| logistics       |   0.1385 | LOGI             |
 | macro_risk      |   0.115  | ECON             |
 | demand          |   0.125  | (equal residual) |
 | openness_legacy |   0.125  | (equal residual) |
@@ -22,11 +22,11 @@
 \toprule
 imsfe\_factor & weight & legacy\_map \\
 \midrule
-cost\_access & 0.1610 & COST \\
 competition & 0.1450 & COMM \\
-logistics & 0.1385 & LOGI \\
-product\_fit & 0.0925 & CULT \\
 institutional & 0.0980 & POLI \\
+product\_fit & 0.0925 & CULT \\
+cost\_access & 0.1610 & COST \\
+logistics & 0.1385 & LOGI \\
 macro\_risk & 0.1150 & ECON \\
 demand & 0.1250 & (equal residual) \\
 openness\_legacy & 0.1250 & (equal residual) \\

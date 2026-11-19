@@ -9,7 +9,7 @@ Coverage is the non-null share of the transformed feature column in the panel.
 | GRW        | HS chapter import growth (3-year CAGR)                              | demand          | benefit     | BACI          | none        |          75    |
 | GDPPC      | GDP per capita PPP                                                  | demand          | benefit     | WB            | log         |          98.33 |
 | DIST       | Population-weighted distance                                        | cost_access     | cost        | CEPII Gravity | log         |          81.94 |
-| TARIF      | Applied preferential tariff (AHS), origin to destination            | cost_access     | cost        | WITS/TRAINS   | none        |          37.22 |
+| TARIF      | Applied preferential tariff (AHS), origin to destination            | cost_access     | cost        | WITS/TRAINS   | none        |          94.86 |
 | FTA        | Preferential trade agreement in force                               | cost_access     | benefit     | CEPII Gravity | none        |          81.94 |
 | LPI        | Logistics Performance Index (overall)                               | logistics       | benefit     | WB            | none        |          40.42 |
 | ASIASH     | China+Vietnam share of destination HS imports                       | competition     | cost        | BACI          | none        |         100    |
@@ -39,7 +39,7 @@ IMPC & HS chapter imports per capita & demand & benefit & BACI+WB & log & 98.330
 GRW & HS chapter import growth (3-year CAGR) & demand & benefit & BACI & none & 75.000 \\
 GDPPC & GDP per capita PPP & demand & benefit & WB & log & 98.330 \\
 DIST & Population-weighted distance & cost\_access & cost & CEPII Gravity & log & 81.940 \\
-TARIF & Applied preferential tariff (AHS), origin to destination & cost\_access & cost & WITS/TRAINS & none & 37.220 \\
+TARIF & Applied preferential tariff (AHS), origin to destination & cost\_access & cost & WITS/TRAINS & none & 94.860 \\
 FTA & Preferential trade agreement in force & cost\_access & benefit & CEPII Gravity & none & 81.940 \\
 LPI & Logistics Performance Index (overall) & logistics & benefit & WB & none & 40.420 \\
 ASIASH & China+Vietnam share of destination HS imports & competition & cost & BACI & none & 100.000 \\

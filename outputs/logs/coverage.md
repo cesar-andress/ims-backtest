@@ -36,12 +36,14 @@ Origins: COL, PER, MEX, CHL, ECU, BRA, ARG
 
 ## WITS
 
-- **WITS (TRN API)**: rows=10788, reporters=43, partners=7, years=2012–2023, missing_year_share=0.000
+- **WITS (TRN API)**: rows=25200, reporters=60, partners=7, years=2012–2023, missing_year_share=0.000
   - hs_chapter values: ['09', '42', '61', '62', '64']
   - missing_chapter_share_vs_settings=0.000
-  - LOCF: enabled in settings=True; flagged_cells=2291; share_of_nonnull=0.243
+  - LOCF: enabled in settings=True; flagged_cells=2291; share_of_nonnull=0.094
   - LOCF fills carry the last observed AHS forward within (reporter, partner, chapter); flagged in column `tarif_locf`.
-  - cached TRN XML files: 3402
+  - tarif_source counts: mfn_no_preference=14865, partner_specific=7149, partner_locf=2291, missing=895
+  - still-missing AHS cells after MFN fallback: 895
+  - cached TRN XML files: 4060
 
 ## Hofstede
 

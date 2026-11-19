@@ -1,7 +1,8 @@
 """Attractiveness × product-market fit strategic matrix (SPEC §3.5).
 
 Main configuration: hierarchical WSM + minmax + expert weights, scores on 0–10.
-Missing criteria are dropped (same complete-case rule as scoring elsewhere); no
+Missing criteria use the shared block missing-data policy (exclude if >20% missing,
+median-impute the rest); candidate destinations are never dropped. No
 silent imputation. Time-invariant dyadic gaps in late BACI years are reported
 in the coverage table.
 """
@@ -25,7 +26,7 @@ from imsfe.legacy import LEGACY_EXCEL_REL
 from imsfe.mcdm import hierarchical_wsm
 from imsfe.normalize import normalize_matrix
 from imsfe.report.figures import figures_dir
-from imsfe.run_experiments import _directions, _prepare_slice, score_origin_year
+from imsfe.run_experiments import _directions, score_origin_year
 from imsfe.weights import Weights, weights_expert_mean
 
 CutoffMode = Literal["median", "fixed5"]
@@ -144,10 +145,13 @@ def _axis_score(
     normalization: str = "minmax",
 ) -> tuple[pd.Series, list[str], list[str]]:
     """Hierarchical WSM on a variable subset; returns scores in ~[0, 10]."""
+    from imsfe.block_prep import prepare_block
+
     directions = _directions(variables)
-    dest = group.set_index("iso3_d")
-    present = [v for v in variable_ids if v in dest.columns]
-    complete, usable = _prepare_slice(dest[present], present)
+    present = [v for v in variable_ids if v in group.columns]
+    prep = prepare_block(group, present)
+    complete = prep.matrix
+    usable = prep.used_variables
     dropped = [v for v in variable_ids if v not in usable]
     if complete.empty or len(complete) < 2 or not usable:
         return pd.Series(dtype=float), usable, dropped
